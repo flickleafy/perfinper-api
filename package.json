@@ -18,14 +18,10 @@
   "scripts": {
     "server": "node index.js",
     "start": "node index.js"
-    
   },
   "nodemonConfig": {
     "ignore": [
       "client/"
     ]
-  },
-  "engines": {
-    "node": "12.x"
   }
 }
