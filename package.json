@@ -1,8 +1,8 @@
 {
-  "name": "bootcamp-full-stack-desafio-final",
+  "name": "personal-finance-helper-api",
   "version": "1.0.0",
   "main": "index.js",
-  "license": "MIT",
+  "license": "",
   "dependencies": {
     "cors": "2.8.5",
     "dotenv": "8.2.0",
