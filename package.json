@@ -1,23 +1,25 @@
 {
   "name": "personal-finance-helper-api",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "src/index.js",
   "license": "",
   "dependencies": {
-    "cors": "2.8.5",
-    "dotenv": "8.2.0",
-    "express": "4.17.1",
-    "mongodb": "3.5.9",
-    "mongoose": "5.9.19",
-    "winston": "3.3.3",
-    "winston-mongodb": "5.0.1"
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "mongodb": "^6.5.0",
+    "mongoose": "^8.3.1",
+    "winston": "^3.13.0",
+    "winston-mongodb": "^5.1.1"
   },
   "devDependencies": {
-    "nodemon": "2.0.4"
+    "@types/express": "^4.17.21",
+    "@types/mongoose": "^5.11.97",
+    "nodemon": "^3.1.0"
   },
   "scripts": {
-    "server": "node index.js",
-    "start": "node index.js"
+    "server": "node src/index.js",
+    "start": "node src/index.js"
   },
   "nodemonConfig": {
     "ignore": [
