@@ -18,8 +18,8 @@
     "nodemon": "^3.1.0"
   },
   "scripts": {
-    "server": "node src/index.js",
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "prod": "node src/index.js"
   },
   "nodemonConfig": {
     "ignore": [
