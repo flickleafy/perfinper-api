@@ -6,7 +6,7 @@ import {
   updateById,
   deleteById,
   findAll,
-} from '../database/categoryRepository.js';
+} from '../repository/categoryRepository.js';
 
 const insertCategory = async (req, res) => {
   try {
