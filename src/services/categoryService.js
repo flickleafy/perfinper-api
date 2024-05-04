@@ -1,16 +1,16 @@
-const logger = require('../config/logger.js');
+import logger from '../config/logger.js';
 
-const {
+import {
   insert,
   findById,
   updateById,
   deleteById,
   findAll,
-} = require('../database/categoryRepository.js');
+} from '../database/categoryRepository.js';
 
 const insertCategory = async (req, res) => {
   try {
-    let categoryObject = categoryPrototype(req.body);
+    const categoryObject = categoryPrototype(req.body);
     const category = await insert(categoryObject);
     res.send(category);
   } catch (error) {
@@ -21,7 +21,7 @@ const insertCategory = async (req, res) => {
 };
 
 const findCategoryById = async (req, res) => {
-  let id = req.params.id;
+  const id = req.params.id;
 
   try {
     const category = await findById(id);
@@ -48,7 +48,10 @@ const updateCategoryById = async (req, res) => {
   const categoryObject = categoryPrototype(req.body);
 
   try {
-    const category = await updateById(id, categoryObject);
+    const updatedCategory = await updateById(id, categoryObject);
+    if (!updatedCategory) {
+      return res.status(404).send({ message: 'Category não encontrada' });
+    }
     res.send({ message: 'Category atualizada com sucesso' });
   } catch (error) {
     res.status(500).send({ message: 'Erro ao atualizar a category: ' + id });
@@ -59,9 +62,8 @@ const deleteCategoryById = async (req, res) => {
   const id = req.params.id;
 
   try {
-    //
-    const category = await deleteById(id);
-    if (!category) {
+    const deletedCategory = await deleteById(id);
+    if (!deletedCategory) {
       return res.status(404).send({ message: 'Category não encontrada' });
     } else {
       res.send({ message: 'Category excluida com sucesso' });
@@ -75,13 +77,10 @@ const deleteCategoryById = async (req, res) => {
 
 const findAllCategories = async (req, res) => {
   try {
-    const category = await findAll();
-
-    res.send(category);
+    const categories = await findAll();
+    res.send(categories);
   } catch (error) {
-    res
-      .status(500)
-      .send({ message: 'Erro ao buscar transações do periodo: ' + period });
+    res.status(500).send({ message: 'Erro ao buscar categories' });
   }
 };
 
@@ -95,7 +94,7 @@ function categoryPrototype(body) {
   return object;
 }
 
-module.exports = {
+export {
   insertCategory,
   findCategoryById,
   updateCategoryById,
