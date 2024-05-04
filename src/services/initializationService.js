@@ -1,4 +1,4 @@
-import { findAll, insert } from '../database/categoryRepository.js';
+import { findAll, insert } from '../repository/categoryRepository.js';
 
 export async function initializeDatabase() {
   const categories = await findAll();
