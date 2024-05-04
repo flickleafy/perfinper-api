@@ -1,7 +1,7 @@
-const express = require('express');
-const transactionService = require('../services/transactionService.js');
-const transactionRouter = express.Router();
+import express from 'express';
+import transactionService from '../services/transactionService.js';
 
+const transactionRouter = express.Router();
 // ?period=2019-03
 transactionRouter.post('/', transactionService.insertTransaction);
 transactionRouter.get('/:id', transactionService.findTransactionById);
@@ -9,13 +9,13 @@ transactionRouter.put('/:id', transactionService.updateTransactionById);
 transactionRouter.delete('/:id', transactionService.deleteTransactionById);
 
 transactionRouter.get(
-  '/period/:yearMonth',
+  '/period/:transactionPeriod',
   transactionService.findAllTransactionsInPeriod
 );
 transactionRouter.delete(
-  '/period/:yearMonth',
+  '/period/:transactionPeriod',
   transactionService.removeAllTransactionsInPeriod
 );
 transactionRouter.post('/periods', transactionService.findUniquePeriods);
 
-module.exports = transactionRouter;
+export default transactionRouter;
