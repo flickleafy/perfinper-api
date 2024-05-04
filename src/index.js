@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 import transactionRoutes from './routes/transactionRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
 import dotenv from 'dotenv';
+import { initializeDatabase } from './services/initializationService.js';
 
 // Initialize dotenv to read .env files
 dotenv.config();
@@ -43,5 +44,10 @@ const connectDB = async () => {
   }
 };
 
-// Initiate the connection
-connectDB();
+const initialize = async () => {
+  // Initiate the connection
+  await connectDB();
+  await initializeDatabase();
+};
+
+initialize();
