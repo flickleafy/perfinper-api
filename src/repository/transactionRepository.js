@@ -4,7 +4,7 @@ export async function findPeriods() {
   try {
     return await TransactionModel.distinct('transactionPeriod');
   } catch (error) {
-    console.error('Error in findPeriods:', error);
+    console.error('Error in findPeriods:', error.message);
     throw new Error('Failed to retrieve distinct transaction periods.');
   }
 }
@@ -16,7 +16,7 @@ export async function deleteAllInPeriod(period) {
       : {};
     await TransactionModel.deleteMany(filter);
   } catch (error) {
-    console.error('Error in deleteAllInPeriod:', error);
+    console.error('Error in deleteAllInPeriod:', error.message);
     throw new Error('Failed to delete transactions in the specified period.');
   }
 }
@@ -29,7 +29,7 @@ export async function deleteById(id) {
     }
     return deletedTransaction;
   } catch (error) {
-    console.error('Error in deleteById:', error);
+    console.error('Error in deleteById:', error.message);
     throw new Error('An error occurred while deleting the transaction by ID.');
   }
 }
@@ -46,7 +46,7 @@ export async function updateById(id, transactionObject) {
     }
     return updatedTransaction;
   } catch (error) {
-    console.error('Error in updateById:', error);
+    console.error('Error in updateById:', error.message);
     throw new Error('An error occurred while updating the transaction by ID.');
   }
 }
@@ -58,7 +58,7 @@ export async function findAllInPeriod(period) {
     }).sort({ transactionDate: 1 });
     return transactions;
   } catch (error) {
-    console.error('Error in findAllInPeriod:', error);
+    console.error('Error in findAllInPeriod:', error.message);
     throw new Error('Failed to find transactions in the specified period.');
   }
 }
@@ -71,7 +71,7 @@ export async function findById(id) {
     }
     return transaction;
   } catch (error) {
-    console.error('Error in findById:', error);
+    console.error('Error in findById:', error.message);
     throw new Error('An error occurred while finding the transaction by ID.');
   }
 }
@@ -82,7 +82,7 @@ export async function insert(transactionObject) {
     await transaction.save();
     return transaction;
   } catch (error) {
-    console.error('Error in insert:', error);
+    console.error('Error in insert:', error.message);
     throw new Error('An error occurred while inserting the transaction.');
   }
 }
