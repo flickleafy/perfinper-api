@@ -1,14 +1,13 @@
-const winston = require('winston');
-const winstondb = require('winston-mongodb');
+import winston from 'winston';
+import winstonMongoDB from 'winston-mongodb';
+import dotenv from 'dotenv';
 
-const dotenv = require('dotenv');
 dotenv.config();
 
-const { combine, timestamp, label, printf } = winston.format;
-
 const { createLogger, transports, format } = winston;
+const { combine, timestamp, label, printf } = format;
 
-const myFormat = format.printf(({ level, message, label, timestamp }) => {
+const myFormat = printf(({ level, message, label, timestamp }) => {
   return `${timestamp} [${label}] ${level}: ${message}`;
 });
 
@@ -27,11 +26,11 @@ const logger = createLogger({
       },
     }),
   ],
-  format: format.combine(
+  format: combine(
     label({ label: 'personalfinance-api' }),
-    format.timestamp(),
+    timestamp(),
     myFormat
   ),
 });
 
-module.export = logger;
+export default logger;
