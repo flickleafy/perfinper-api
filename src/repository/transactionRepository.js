@@ -5,27 +5,29 @@ export async function findPeriods() {
     return await TransactionModel.distinct('transactionPeriod');
   } catch (error) {
     console.error('Error in findPeriods:', error);
-    throw new Error('An error occurred while finding periods.');
+    throw new Error('Failed to retrieve distinct transaction periods.');
   }
 }
 
 export async function deleteAllInPeriod(period) {
   try {
     let filter = period
-      ? { name: { $regex: new RegExp(period), $options: 'i' } }
+      ? { transactionPeriod: { $regex: new RegExp(period), $options: 'i' } }
       : {};
     await TransactionModel.deleteMany(filter);
   } catch (error) {
     console.error('Error in deleteAllInPeriod:', error);
-    throw new Error(
-      'An error occurred while deleting all transactions in the period.'
-    );
+    throw new Error('Failed to delete transactions in the specified period.');
   }
 }
 
 export async function deleteById(id) {
   try {
-    return await TransactionModel.findByIdAndDelete(id);
+    const deletedTransaction = await TransactionModel.findByIdAndDelete(id);
+    if (!deletedTransaction) {
+      throw new Error('No transaction found with the given ID.');
+    }
+    return deletedTransaction;
   } catch (error) {
     console.error('Error in deleteById:', error);
     throw new Error('An error occurred while deleting the transaction by ID.');
@@ -34,9 +36,15 @@ export async function deleteById(id) {
 
 export async function updateById(id, transactionObject) {
   try {
-    return await TransactionModel.findByIdAndUpdate(id, transactionObject, {
-      new: true,
-    });
+    const updatedTransaction = await TransactionModel.findByIdAndUpdate(
+      id,
+      transactionObject,
+      { new: true }
+    );
+    if (!updatedTransaction) {
+      throw new Error('No transaction found with the given ID.');
+    }
+    return updatedTransaction;
   } catch (error) {
     console.error('Error in updateById:', error);
     throw new Error('An error occurred while updating the transaction by ID.');
@@ -45,20 +53,23 @@ export async function updateById(id, transactionObject) {
 
 export async function findAllInPeriod(period) {
   try {
-    return await TransactionModel.find({ transactionPeriod: period }).sort({
-      day: 1,
-    });
+    const transactions = await TransactionModel.find({
+      transactionPeriod: period,
+    }).sort({ transactionDate: 1 });
+    return transactions;
   } catch (error) {
     console.error('Error in findAllInPeriod:', error);
-    throw new Error(
-      'An error occurred while finding all transactions in the period.'
-    );
+    throw new Error('Failed to find transactions in the specified period.');
   }
 }
 
 export async function findById(id) {
   try {
-    return await TransactionModel.findById(id);
+    const transaction = await TransactionModel.findById(id);
+    if (!transaction) {
+      throw new Error('No transaction found with the given ID.');
+    }
+    return transaction;
   } catch (error) {
     console.error('Error in findById:', error);
     throw new Error('An error occurred while finding the transaction by ID.');
