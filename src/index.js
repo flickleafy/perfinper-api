@@ -1,8 +1,9 @@
-const express = require('express');
-const cors = require('cors');
-const mongoose = require('mongoose');
-const routes = require('./routes/routes.js');
-const dotenv = require('dotenv');
+import express from 'express';
+import cors from 'cors';
+import mongoose from 'mongoose';
+import transactionRoutes from './routes/transactionRoutes.js';
+import categoryRoutes from './routes/categoryRoutes.js';
+import dotenv from 'dotenv';
 
 // Initialize dotenv to read .env files
 dotenv.config();
@@ -18,7 +19,8 @@ app.get('/api/', (_, response) => {
   });
 });
 
-app.use('/api/transaction', routes);
+app.use('/api/transaction', transactionRoutes);
+app.use('/api/category', categoryRoutes);
 
 /**
  * Database Connection Setup
@@ -28,7 +30,7 @@ const { DB_CONNECTION } = process.env;
 console.log('Initiating MongoDB connection...');
 const connectDB = async () => {
   try {
-    await mongoose.connect(DB_CONNECTION, {});
+    await mongoose.connect(DB_CONNECTION);
     console.log('Connected to MongoDB');
 
     // Server Initialization
