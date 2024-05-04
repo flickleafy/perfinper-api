@@ -26,6 +26,22 @@ const transactionSchema = mongoose.Schema({
   transactionOrigin: String,
 });
 
+const transformTransactionFields = (doc, ret, options) => {
+  ret.id = ret._id;
+  delete ret._id; // Delete _id from the response
+  delete ret.__v; // Optional: delete version key if not needed
+  return ret;
+};
+
+// Ensure that _id and __v is not returned
+transactionSchema.set('toJSON', {
+  transform: transformTransactionFields,
+});
+
+transactionSchema.set('toObject', {
+  transform: transformTransactionFields,
+});
+
 const TransactionModel = mongoose.model('transaction', transactionSchema);
 
 export default TransactionModel;
