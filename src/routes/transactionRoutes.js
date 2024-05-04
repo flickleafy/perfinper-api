@@ -1,5 +1,5 @@
 import express from 'express';
-import transactionService from '../services/transactionService.js';
+import * as transactionService from '../services/transactionService.js';
 
 const transactionRouter = express.Router();
 // ?period=2019-03
