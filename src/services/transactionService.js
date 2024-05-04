@@ -1,78 +1,51 @@
-const mongoose = require('mongoose');
-const logger = require('../config/logger.js');
-const ObjectId = mongoose.Types.ObjectId;
-
-const TransactionModel = require('../models/TransactionModel.js');
+import logger from '../config/logger.js';
+import {
+  insert,
+  findById,
+  findAllInPeriod,
+  updateById,
+  deleteById,
+  deleteAllInPeriod,
+  findPeriods,
+} from '../repository/transactionRepository.js';
 
 const insertTransaction = async (req, res) => {
   try {
-    //
-    let newTransactionJSON = transactionPrototype(req.body);
-    const transaction = new TransactionModel(newTransactionJSON);
-    await transaction.save();
+    let transactionObject = transactionPrototype(req.body);
+    const transaction = await insert(transactionObject);
     res.send(transaction);
-    //
-    //logger.info(`POST /transaction - ${JSON.stringify()}`);
   } catch (error) {
     res.status(500).send({
       message: error.message || 'Algum erro ocorreu ao salvar transaction',
     });
-    // logger.error(`POST /transaction - ${JSON.stringify(error.message)}`);
   }
 };
 
 const findTransactionById = async (req, res) => {
   let id = req.params.id;
-
-  //condicao para o filtro no findAll
-  /*let filter = name
-    ? { name: { $regex: new RegExp(name), $options: 'i' } }
-    : {};*/
-
   try {
-    //
-    const transaction = await TransactionModel.findById(id);
-
+    const transaction = await findById(id);
     if (!transaction) {
       return res.status(404).send({ message: 'Transaction não encontrada' });
     } else {
       res.send(transaction);
     }
-    //
-    //logger.info(`GET /transactions`);
   } catch (error) {
     res.status(500).send({
       message: error.message || 'Erro ao listar a transaction',
     });
-    // logger.error(`GET /transactions - ${JSON.stringify(error.message)}`);
   }
 };
 
 const findAllTransactionsInPeriod = async (req, res) => {
   const period = req.params.transactionPeriod;
-
   try {
-    //
-    // let regex = new RegExp(req.params.id, 'i');
-    let transaction;
-    try {
-      transaction = await TransactionModel.find({
-        transactionPeriod: period,
-      }).sort({
-        day: 1,
-      });
-    } catch (error) {
-      // logger.error(`GET /transactionsInPeriod - ${JSON.stringify(error.message)}`);
-    }
-
-    res.send(transaction);
-    //
-    //logger.info(`GET /transactionsInPeriod - ${period}`);
+    let transactions = await findAllInPeriod(period);
+    res.send(transactions);
   } catch (error) {
     res
       .status(500)
       .send({ message: 'Erro ao buscar transações do periodo: ' + period });
-    // logger.error(`GET /transactionsInPeriod - ${JSON.stringify(error.message)}`);
   }
 };
 
@@ -84,91 +57,56 @@ const updateTransactionById = async (req, res) => {
     });
   }
 
-  let newTransactionJSON = transactionPrototype(req.body);
-
-  let transaction = null;
+  let transactionObject = transactionPrototype(req.body);
   try {
-    transaction = await TransactionModel.findByIdAndUpdate(
-      id,
-      newTransactionJSON
-    );
-    //
+    let transaction = await updateById(id, transactionObject);
+    if (!transaction) {
+      return res.status(404).send({ message: 'Transaction não encontrada' });
+    }
     res.send({ message: 'Transaction atualizada com sucesso' });
-
-    //logger.info(`PUT /transaction - ${id} - ${JSON.stringify(req.body)}`);
   } catch (error) {
     res.status(500).send({ message: 'Erro ao atualizar a transaction: ' + id });
-    // logger.error(`PUT /transaction - ${JSON.stringify(error.message)}`);
   }
 };
 
 const deleteTransactionById = async (req, res) => {
   const id = req.params.id;
-
   try {
-    //
-
-    const transaction = await TransactionModel.findByIdAndDelete(id);
+    const transaction = await deleteById(id);
     if (!transaction) {
       return res.status(404).send({ message: 'Transaction não encontrada' });
     } else {
       res.send({ message: 'Transaction excluida com sucesso' });
     }
-    //logger.info(`DELETE /transaction - ${id}`);
   } catch (error) {
     res
       .status(500)
       .send({ message: 'Nao foi possivel deletar a transaction: ' + id });
-    // logger.error(`DELETE /transaction - ${JSON.stringify(error.message)}`);
   }
 };
 
 const removeAllTransactionsInPeriod = async (req, res) => {
   const period = req.query.period;
-  //condicao para o filtro no findAll
-  let filter = period
-    ? { name: { $regex: new RegExp(period), $options: 'i' } }
-    : {};
 
   try {
-    //
-    //const transaction = await TransactionModel.deleteMany(filter);
-    //
-    res.send({
-      message: `Transactions excluidos`,
-    });
-    //logger.info(`DELETE /transactions`);
+    await deleteAllInPeriod(period);
+    res.send({ message: `Transactions excluidos` });
   } catch (error) {
     res.status(500).send({
       message: 'Erro ao excluir todas as transactions do periodo: ' + period,
     });
-    // logger.error(`DELETE /transactions - ${JSON.stringify(error.message)}`);
   }
 };
 
 const findUniquePeriods = async (req, res) => {
-  let periods = req;
-
   try {
-    try {
-      periods = await TransactionModel.find({}) // campos retornados
-        .distinct('transactionPeriod');
-    } catch (error) {
-      // logger.error(`GET /transactionsInPeriod - ${JSON.stringify(error.message)}`);
-    }
-
+    let periods = await findPeriods();
     res.send(periods);
-    //
-    //logger.info(`GET /transactionsInPeriod - ${period}`);
   } catch (error) {
-    res
-      .status(500)
-      .send({ message: 'Erro ao buscar transações do periodo: ' + periods });
-    // logger.error(`GET /transactionsInPeriod - ${JSON.stringify(error.message)}`);
+    res.status(500).send({ message: 'Erro ao buscar transações do periodo' });
   }
 };
 
-// helper functions
 function transactionPrototype(body) {
   const {
     transactionDate,
@@ -193,7 +131,7 @@ function transactionPrototype(body) {
     transactionOrigin,
   } = body;
 
-  let object = {
+  return {
     transactionDate,
     transactionPeriod,
     totalValue,
@@ -215,18 +153,9 @@ function transactionPrototype(body) {
     companyCnpj,
     transactionOrigin,
   };
-
-  return object;
 }
 
-function checkSingleDigit(number) {
-  if (/^\d$/.test(number)) {
-    return `0${number}`;
-  }
-  return number;
-}
-
-module.exports = {
+export {
   insertTransaction,
   findTransactionById,
   updateTransactionById,
