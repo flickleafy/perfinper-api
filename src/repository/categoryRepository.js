@@ -2,7 +2,10 @@ import CategoryModel from '../models/CategoryModel.js';
 
 export async function findAll() {
   try {
-    const categories = await CategoryModel.find({}).sort({ name: 1 });
+    const categories = await CategoryModel.aggregate([
+      { $project: { id: '$_id', _id: 0, name: 1, iconName: 1 } },
+      { $sort: { name: 1 } },
+    ]);
     return categories;
   } catch (error) {
     // Handle or log the error appropriately
