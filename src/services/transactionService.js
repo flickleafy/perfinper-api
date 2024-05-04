@@ -2,16 +2,12 @@ const mongoose = require('mongoose');
 const logger = require('../config/logger.js');
 const ObjectId = mongoose.Types.ObjectId;
 
-// Aqui havia um erro difícil de pegar. Importei como "transactionModel",
-// com "t" minúsculo. No Windows, isso não faz diferença. Mas como no Heroku
-// o servidor é Linux, isso faz diferença. Gastei umas boas horas tentando
-// descobrir esse erro :-/
 const TransactionModel = require('../models/TransactionModel.js');
 
 const insertTransaction = async (req, res) => {
   try {
     //
-    let newTransactionJSON = newTransaction(req.body);
+    let newTransactionJSON = transactionPrototype(req.body);
     const transaction = new TransactionModel(newTransactionJSON);
     await transaction.save();
     res.send(transaction);
@@ -53,14 +49,16 @@ const findTransactionById = async (req, res) => {
 };
 
 const findAllTransactionsInPeriod = async (req, res) => {
-  const period = req.params.yearMonth;
+  const period = req.params.transactionPeriod;
 
   try {
     //
     // let regex = new RegExp(req.params.id, 'i');
     let transaction;
     try {
-      transaction = await TransactionModel.find({ yearMonth: period }).sort({
+      transaction = await TransactionModel.find({
+        transactionPeriod: period,
+      }).sort({
         day: 1,
       });
     } catch (error) {
@@ -86,7 +84,7 @@ const updateTransactionById = async (req, res) => {
     });
   }
 
-  let newTransactionJSON = newTransaction(req.body);
+  let newTransactionJSON = transactionPrototype(req.body);
 
   let transaction = null;
   try {
@@ -154,7 +152,7 @@ const findUniquePeriods = async (req, res) => {
   try {
     try {
       periods = await TransactionModel.find({}) // campos retornados
-        .distinct('yearMonth');
+        .distinct('transactionPeriod');
     } catch (error) {
       // logger.error(`GET /transactionsInPeriod - ${JSON.stringify(error.message)}`);
     }
@@ -171,21 +169,54 @@ const findUniquePeriods = async (req, res) => {
 };
 
 // helper functions
-function newTransaction(body) {
-  const { description, value, category, year, month, day, type } = body;
+function transactionPrototype(body) {
+  const {
+    transactionDate,
+    transactionPeriod,
+    totalValue,
+    individualValue,
+    freightValue,
+    itemName,
+    itemDescription,
+    itemUnits,
+    transactionLocation,
+    transactionType,
+    transactionCategory,
+    groupedItem,
+    groupedItemsReference,
+    transactionFiscalNote,
+    transactionId,
+    transactionStatus,
+    companyName,
+    companySellerName,
+    companyCnpj,
+    transactionOrigin,
+  } = body;
 
-  let json = {
-    description: description,
-    value: value,
-    category: category,
-    year: year,
-    month: month,
-    day: day,
-    yearMonth: `${year}-${checkSingleDigit(month)}`,
-    yearMonthDay: `${year}-${checkSingleDigit(month)}-${checkSingleDigit(day)}`,
-    type: type,
+  let object = {
+    transactionDate,
+    transactionPeriod,
+    totalValue,
+    individualValue,
+    freightValue,
+    itemName,
+    itemDescription,
+    itemUnits,
+    transactionLocation,
+    transactionType,
+    transactionCategory,
+    groupedItem,
+    groupedItemsReference,
+    transactionFiscalNote,
+    transactionId,
+    transactionStatus,
+    companyName,
+    companySellerName,
+    companyCnpj,
+    transactionOrigin,
   };
-  return json;
+
+  return object;
 }
 
 function checkSingleDigit(number) {
@@ -196,11 +227,11 @@ function checkSingleDigit(number) {
 }
 
 module.exports = {
-  insertTransaction: insertTransaction,
-  findTransactionById: findTransactionById,
-  updateTransactionById: updateTransactionById,
-  deleteTransactionById: deleteTransactionById,
-  findAllTransactionsInPeriod: findAllTransactionsInPeriod,
-  removeAllTransactionsInPeriod: removeAllTransactionsInPeriod,
-  findUniquePeriods: findUniquePeriods,
+  insertTransaction,
+  findTransactionById,
+  updateTransactionById,
+  deleteTransactionById,
+  findAllTransactionsInPeriod,
+  removeAllTransactionsInPeriod,
+  findUniquePeriods,
 };
