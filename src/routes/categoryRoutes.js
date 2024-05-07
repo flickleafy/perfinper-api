@@ -8,6 +8,6 @@ categoryRouter.get('/:id', categoryService.findCategoryById);
 categoryRouter.put('/:id', categoryService.updateCategoryById);
 categoryRouter.delete('/:id', categoryService.deleteCategoryById);
 
-categoryRouter.get('/all', categoryService.findAllCategories);
+categoryRouter.get('/all/itens', categoryService.findAllCategories);
 
 export default categoryRouter;
