@@ -92,6 +92,19 @@ export async function findAllInPeriod(period) {
   }
 }
 
+export async function findAllInYear(year) {
+  try {
+    const regex = new RegExp(`^${year}-`);
+    const transactions = await TransactionModel.find({
+      transactionPeriod: regex,
+    }).sort({ transactionDate: 1 });
+    return transactions;
+  } catch (error) {
+    console.error('Error in findAllInYear:', error.message);
+    throw new Error('Failed to find transactions in the specified year.');
+  }
+}
+
 export async function findById(id) {
   try {
     const transaction = await TransactionModel.findById(id);

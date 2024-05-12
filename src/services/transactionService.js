@@ -3,6 +3,7 @@ import {
   insert,
   findById,
   findAllInPeriod,
+  findAllInYear,
   updateById,
   deleteById,
   deleteAllInPeriod,
@@ -40,9 +41,14 @@ export const findTransactionById = async (req, res) => {
 };
 
 export const findAllTransactionsInPeriod = async (req, res) => {
-  const period = req.params.transactionPeriod;
+  const period = String(req.params.transactionPeriod);
   try {
-    let transactions = await findAllInPeriod(period);
+    let transactions = [];
+    if (period.length === 4) {
+      transactions = await findAllInYear(period);
+    } else {
+      transactions = await findAllInPeriod(period);
+    }
     res.send(transactions);
   } catch (error) {
     res
