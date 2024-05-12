@@ -3,6 +3,7 @@ import cors from 'cors';
 import mongoose from 'mongoose';
 import transactionRoutes from './routes/transactionRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
+import importRoutes from './routes/importRoutes.js';
 import dotenv from 'dotenv';
 import { initializeDatabase } from './services/initializationService.js';
 
@@ -22,6 +23,7 @@ app.get('/api/', (_, response) => {
 
 app.use('/api/transaction', transactionRoutes);
 app.use('/api/category', categoryRoutes);
+app.use('/api/import', importRoutes);
 
 /**
  * Database Connection Setup
