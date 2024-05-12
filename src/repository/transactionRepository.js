@@ -11,10 +11,27 @@ export async function findPeriods() {
 
 export async function findYears() {
   try {
-    return await TransactionModel.distinct(
-      'year', // Field to find distinct values
-      { transactionDate: { $year: '$transactionDate' } } // Projection to extract year
-    );
+    let distinctYears = await TransactionModel.aggregate([
+      {
+        $project: {
+          year: { $toString: { $year: '$transactionDate' } }, // Extract year as string
+        },
+      },
+      {
+        $group: {
+          _id: null, // Group all documents
+          years: { $addToSet: '$year' }, // Add distinct years to an array
+        },
+      },
+      {
+        $project: {
+          _id: 0, // Exclude _id from the result
+          distinctYears: '$$ROOT.years', // Access years directly from root document
+        },
+      },
+    ]);
+    distinctYears = distinctYears[0].distinctYears;
+    return distinctYears;
   } catch (error) {
     console.error('Error in findYears:', error.message);
     throw new Error('Failed to retrieve distinct transaction years.');
