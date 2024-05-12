@@ -7,9 +7,11 @@ import {
   deleteById,
   deleteAllInPeriod,
   findPeriods,
+  findYears,
 } from '../repository/transactionRepository.js';
+import { transactionPrototype } from './transactionPrototype.js';
 
-const insertTransaction = async (req, res) => {
+export const insertTransaction = async (req, res) => {
   try {
     let transactionObject = transactionPrototype(req.body);
     const transaction = await insert(transactionObject);
@@ -21,7 +23,7 @@ const insertTransaction = async (req, res) => {
   }
 };
 
-const findTransactionById = async (req, res) => {
+export const findTransactionById = async (req, res) => {
   let id = req.params.id;
   try {
     const transaction = await findById(id);
@@ -37,7 +39,7 @@ const findTransactionById = async (req, res) => {
   }
 };
 
-const findAllTransactionsInPeriod = async (req, res) => {
+export const findAllTransactionsInPeriod = async (req, res) => {
   const period = req.params.transactionPeriod;
   try {
     let transactions = await findAllInPeriod(period);
@@ -49,7 +51,7 @@ const findAllTransactionsInPeriod = async (req, res) => {
   }
 };
 
-const updateTransactionById = async (req, res) => {
+export const updateTransactionById = async (req, res) => {
   const id = req.params.id;
   if (!req.body) {
     return res.status(400).send({
@@ -69,7 +71,7 @@ const updateTransactionById = async (req, res) => {
   }
 };
 
-const deleteTransactionById = async (req, res) => {
+export const deleteTransactionById = async (req, res) => {
   const id = req.params.id;
   try {
     const transaction = await deleteById(id);
@@ -85,7 +87,7 @@ const deleteTransactionById = async (req, res) => {
   }
 };
 
-const removeAllTransactionsInPeriod = async (req, res) => {
+export const removeAllTransactionsInPeriod = async (req, res) => {
   const period = req.query.period;
 
   try {
@@ -98,69 +100,20 @@ const removeAllTransactionsInPeriod = async (req, res) => {
   }
 };
 
-const findUniquePeriods = async (req, res) => {
+export const findUniquePeriods = async (req, res) => {
   try {
     let periods = await findPeriods();
     res.send(periods);
   } catch (error) {
-    res.status(500).send({ message: 'Erro ao buscar transações do periodo' });
+    res.status(500).send({ message: 'Erro ao buscar periodos' });
   }
 };
 
-function transactionPrototype(body) {
-  const {
-    transactionDate,
-    transactionPeriod,
-    totalValue,
-    individualValue,
-    freightValue,
-    itemName,
-    itemDescription,
-    itemUnits,
-    transactionLocation,
-    transactionType,
-    transactionCategory,
-    groupedItem,
-    groupedItemsReference,
-    transactionFiscalNote,
-    transactionId,
-    transactionStatus,
-    companyName,
-    companySellerName,
-    companyCnpj,
-    transactionOrigin,
-  } = body;
-
-  return {
-    transactionDate,
-    transactionPeriod,
-    totalValue,
-    individualValue,
-    freightValue,
-    itemName,
-    itemDescription,
-    itemUnits,
-    transactionLocation,
-    transactionType,
-    transactionCategory,
-    groupedItem,
-    groupedItemsReference,
-    transactionFiscalNote,
-    transactionId,
-    transactionStatus,
-    companyName,
-    companySellerName,
-    companyCnpj,
-    transactionOrigin,
-  };
-}
-
-export {
-  insertTransaction,
-  findTransactionById,
-  updateTransactionById,
-  deleteTransactionById,
-  findAllTransactionsInPeriod,
-  removeAllTransactionsInPeriod,
-  findUniquePeriods,
+export const findUniqueYears = async (req, res) => {
+  try {
+    let years = await findYears();
+    res.send(years);
+  } catch (error) {
+    res.status(500).send({ message: 'Erro ao buscar anos' });
+  }
 };

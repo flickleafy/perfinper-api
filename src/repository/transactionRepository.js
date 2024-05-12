@@ -9,6 +9,18 @@ export async function findPeriods() {
   }
 }
 
+export async function findYears() {
+  try {
+    return await TransactionModel.distinct(
+      'year', // Field to find distinct values
+      { transactionDate: { $year: '$transactionDate' } } // Projection to extract year
+    );
+  } catch (error) {
+    console.error('Error in findYears:', error.message);
+    throw new Error('Failed to retrieve distinct transaction years.');
+  }
+}
+
 export async function deleteAllInPeriod(period) {
   try {
     let filter = period
