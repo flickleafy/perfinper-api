@@ -1,13 +1,19 @@
 import express from 'express';
-import * as categoryService from '../services/categoryService.js';
+import {
+  deleteCategoryById,
+  findAllCategories,
+  findCategoryById,
+  insertCategory,
+  updateCategoryById,
+} from '../services/categoryService.js';
 
 const categoryRouter = express.Router();
 
-categoryRouter.post('/', categoryService.insertCategory);
-categoryRouter.get('/:id', categoryService.findCategoryById);
-categoryRouter.put('/:id', categoryService.updateCategoryById);
-categoryRouter.delete('/:id', categoryService.deleteCategoryById);
+categoryRouter.post('/', insertCategory);
+categoryRouter.get('/:id', findCategoryById);
+categoryRouter.put('/:id', updateCategoryById);
+categoryRouter.delete('/:id', deleteCategoryById);
 
-categoryRouter.get('/all/itens', categoryService.findAllCategories);
+categoryRouter.get('/all/itens', findAllCategories);
 
 export default categoryRouter;
