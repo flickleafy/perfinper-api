@@ -8,7 +8,7 @@ import {
   findAll,
 } from '../repository/categoryRepository.js';
 
-const insertCategory = async (req, res) => {
+export const insertCategory = async (req, res) => {
   try {
     const categoryObject = categoryPrototype(req.body);
     const category = await insert(categoryObject);
@@ -20,7 +20,7 @@ const insertCategory = async (req, res) => {
   }
 };
 
-const findCategoryById = async (req, res) => {
+export const findCategoryById = async (req, res) => {
   const id = req.params.id;
 
   try {
@@ -37,7 +37,7 @@ const findCategoryById = async (req, res) => {
   }
 };
 
-const updateCategoryById = async (req, res) => {
+export const updateCategoryById = async (req, res) => {
   const id = req.params.id;
   if (!req.body) {
     return res.status(400).send({
@@ -58,7 +58,7 @@ const updateCategoryById = async (req, res) => {
   }
 };
 
-const deleteCategoryById = async (req, res) => {
+export const deleteCategoryById = async (req, res) => {
   const id = req.params.id;
 
   try {
@@ -75,7 +75,7 @@ const deleteCategoryById = async (req, res) => {
   }
 };
 
-const findAllCategories = async (req, res) => {
+export const findAllCategories = async (req, res) => {
   try {
     const categories = await findAll();
     res.send(categories);
@@ -93,11 +93,3 @@ function categoryPrototype(body) {
   };
   return object;
 }
-
-export {
-  insertCategory,
-  findCategoryById,
-  updateCategoryById,
-  deleteCategoryById,
-  findAllCategories,
-};
