@@ -19,7 +19,7 @@ export function transactionPrototype(body) {
     companyName,
     companySellerName,
     companyCnpj,
-    transactionOrigin,
+    transactionSource,
   } = body;
 
   return {
@@ -42,6 +42,6 @@ export function transactionPrototype(body) {
     companyName,
     companySellerName,
     companyCnpj,
-    transactionOrigin,
+    transactionSource,
   };
 }
