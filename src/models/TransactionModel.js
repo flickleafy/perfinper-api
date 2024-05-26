@@ -23,7 +23,7 @@ const transactionSchema = mongoose.Schema({
   companyName: String,
   companySellerName: String,
   companyCnpj: String,
-  transactionOrigin: String,
+  transactionSource: String,
 });
 
 const transformTransactionFields = (doc, ret, options) => {
