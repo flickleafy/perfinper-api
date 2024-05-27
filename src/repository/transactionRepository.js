@@ -128,3 +128,23 @@ export async function insert(transactionObject) {
     throw new Error('An error occurred while inserting the transaction.');
   }
 }
+
+export async function getTransactionsIdEmptyCnpj() {
+  try {
+    const transactions = await TransactionModel.find({
+      $or: [
+        { companyCnpj: null }, // Matches explicitly null values
+        { companyCnpj: { $exists: false } }, // Matches documents where companyCnpj does not exist
+        { companyCnpj: '' }, // Matches empty strings
+        { companyCnpj: { $type: 10 } }, // Matches values that are undefined
+      ],
+    })
+      .sort({ transactionDate: 1 })
+      .select('_id'); // Select only the transaction ID field
+
+    return transactions.map((t) => t._id);
+  } catch (error) {
+    console.error('Error in getTransactionsIdEmptyCnpj:', error.message);
+    throw new Error('An error occurred while retrieving transactions.');
+  }
+}
