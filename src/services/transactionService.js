@@ -10,7 +10,7 @@ import {
   findPeriods,
   findYears,
 } from '../repository/transactionRepository.js';
-import { transactionPrototype } from './transactionPrototype.js';
+import { transactionPrototype } from './prototype/transactionPrototype.js';
 
 export const insertTransaction = async (req, res) => {
   try {

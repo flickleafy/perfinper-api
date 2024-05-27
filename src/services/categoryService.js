@@ -7,6 +7,7 @@ import {
   deleteById,
   findAll,
 } from '../repository/categoryRepository.js';
+import { categoryPrototype } from './prototype/categoryPrototype.js';
 
 export const insertCategory = async (req, res) => {
   try {
@@ -83,13 +84,3 @@ export const findAllCategories = async (req, res) => {
     res.status(500).send({ message: 'Erro ao buscar categories' });
   }
 };
-
-function categoryPrototype(body) {
-  const { name, iconName } = body;
-
-  let object = {
-    name,
-    iconName,
-  };
-  return object;
-}
