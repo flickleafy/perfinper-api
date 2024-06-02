@@ -148,3 +148,18 @@ export async function getTransactionsIdEmptyCnpj() {
     throw new Error('An error occurred while retrieving transactions.');
   }
 }
+
+export async function getTransactionsIdTransactionSource(source) {
+  try {
+    const transactions = await TransactionModel.find({
+      transactionSource: source,
+    })
+      .sort({ transactionDate: 1 })
+      .select('_id'); // Select only the transaction ID field
+
+    return transactions.map((t) => t._id);
+  } catch (error) {
+    console.error('Error in getTransactionsIdEmptyCnpj:', error.message);
+    throw new Error('An error occurred while retrieving transactions.');
+  }
+}
