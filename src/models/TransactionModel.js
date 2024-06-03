@@ -34,8 +34,8 @@ const transactionSchema = mongoose.Schema({
   },
   items: [
     {
-      transactionName: String, // brief description/name about the item
-      transactionDescription: String, // detailed information about the item
+      itemName: String, // brief description/name about the item
+      itemDescription: String, // detailed information about the item
       itemValue: String, // individual value of item
       itemUnits: { type: Number, min: 1 }, // amount of units of the same item
     },
