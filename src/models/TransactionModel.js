@@ -15,6 +15,7 @@ const transactionSchema = mongoose.Schema({
     enum: ['online', 'local', 'other'],
   },
   transactionType: { type: String, enum: ['credit', 'debit'] },
+  transactionInstallments: String,
   transactionCategory: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'category',
