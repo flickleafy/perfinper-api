@@ -50,5 +50,3 @@ export const monthsYearThreeLetterAcronymToExtense = {
   nov: 'Novembro',
   dez: 'Dezembro',
 };
-
-console.log(months);
