@@ -16,6 +16,12 @@ const transactionSchema = mongoose.Schema({
   },
   transactionType: { type: String, enum: ['credit', 'debit'] },
   transactionInstallments: String,
+  installments: {
+    installmentsAmount: String,
+    installmentsInformation: [
+      { installmentDate: { type: Date }, installmentValue: String },
+    ],
+  },
   transactionCategory: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'category',
