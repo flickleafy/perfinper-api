@@ -63,6 +63,32 @@ export async function deleteById(id) {
   }
 }
 
+export async function deleteByIds(ids) {
+  try {
+    // Validate that the input is an array and has at least one ID
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new Error('Invalid input: ids must be a non-empty array.');
+    }
+
+    // Delete all transactions that have an ID in the ids array
+    const result = await TransactionModel.deleteMany({
+      _id: { $in: ids },
+    });
+
+    // Check if any documents were deleted
+    if (result.deletedCount === 0) {
+      throw new Error('No transactions found with the given IDs.');
+    }
+
+    return result;
+  } catch (error) {
+    console.error('Error in deleteByIds:', error.message);
+    throw new Error(
+      'An error occurred while deleting the transactions by IDs.'
+    );
+  }
+}
+
 export async function updateById(id, transactionObject) {
   try {
     const updatedTransaction = await TransactionModel.findByIdAndUpdate(
@@ -161,5 +187,49 @@ export async function getTransactionsIdTransactionSource(source) {
   } catch (error) {
     console.error('Error in getTransactionsIdEmptyCnpj:', error.message);
     throw new Error('An error occurred while retrieving transactions.');
+  }
+}
+
+export async function findCreditCardInstallments() {
+  try {
+    let distinctDescriptions = await TransactionModel.aggregate([
+      {
+        $match: {
+          transactionDescription: { $regex: '\\- \\d+\\/\\d+' },
+          paymentMethod: 'credit card',
+        },
+      },
+      {
+        $group: {
+          _id: '$transactionDescription',
+          uniqueDescriptions: { $first: '$transactionDescription' },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          transactionDescription: '$uniqueDescriptions',
+        },
+      },
+    ]);
+    return distinctDescriptions;
+  } catch (error) {
+    console.error('Error in findCreditCardInstallments:', error.message);
+    throw new Error('Failed to retrieve distinct credit card installments.');
+  }
+}
+
+export async function findAllByDescription(description) {
+  try {
+    const regex = new RegExp(`${description}`, 'i');
+    const transactions = await TransactionModel.find({
+      transactionDescription: regex,
+    }).sort({ transactionDate: 1 });
+    return transactions;
+  } catch (error) {
+    console.error('Error in findAllByDescription:', error.message);
+    throw new Error(
+      'Failed to find transactions with the specified description.'
+    );
   }
 }
