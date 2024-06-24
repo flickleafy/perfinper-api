@@ -6,10 +6,7 @@ import categoryRoutes from './routes/categoryRoutes.js';
 import importRoutes from './routes/importRoutes.js';
 import dotenv from 'dotenv';
 import { initializeDatabase } from './services/initializationService.js';
-import {
-  fixDatefieldTimezone,
-  identifyAndUpdateCompanyFields,
-} from './services/migrationService.js';
+import { mergeCreditCardTransactionsInstallments } from './services/migrationService/index.js';
 
 // Initialize dotenv to read .env files
 dotenv.config();
@@ -56,6 +53,7 @@ const initialize = async () => {
   await initializeDatabase();
   // await identifyAndUpdateCompanyFields();
   // await fixDatefieldTimezone();
+  await mergeCreditCardTransactionsInstallments();
 };
 
 initialize();
