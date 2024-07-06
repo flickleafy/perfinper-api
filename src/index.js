@@ -4,9 +4,10 @@ import mongoose from 'mongoose';
 import transactionRoutes from './routes/transactionRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
 import importRoutes from './routes/importRoutes.js';
+import exportRoutes from './routes/exportRoutes.js';
 import dotenv from 'dotenv';
 import { initializeDatabase } from './services/initializationService.js';
-import { mergeCreditCardTransactionsInstallments } from './services/migrationService/index.js';
+import { identifyAndUpdateCompanyFields } from './services/migrationService/index.js';
 
 // Initialize dotenv to read .env files
 dotenv.config();
@@ -25,6 +26,7 @@ app.get('/api/', (_, response) => {
 app.use('/api/transaction', transactionRoutes);
 app.use('/api/category', categoryRoutes);
 app.use('/api/import', importRoutes);
+app.use('/api/export', exportRoutes);
 
 /**
  * Database Connection Setup
@@ -51,9 +53,9 @@ const initialize = async () => {
   // Initiate the connection
   await connectDB();
   await initializeDatabase();
-  // await identifyAndUpdateCompanyFields();
+  await identifyAndUpdateCompanyFields();
   // await fixDatefieldTimezone();
-  await mergeCreditCardTransactionsInstallments();
+  // await mergeCreditCardTransactionsInstallments();
 };
 
 initialize();
