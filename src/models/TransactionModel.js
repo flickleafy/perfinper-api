@@ -1,9 +1,10 @@
 import mongoose from 'mongoose';
+import { paymentMethodAdapter } from '../services/prototype/paymenthMethodAdapter.js';
 
 const transactionSchema = mongoose.Schema({
   transactionDate: { type: Date, default: Date.now },
   transactionPeriod: String, // month and year of transaction
-  transactionSource: String, // manual, nubank, digio, mercadolivre, flash
+  transactionSource: String, // manual, nubank, nubank-credit, digio-credit, mercadolivre, flash
   transactionValue: String,
   transactionName: String, // brief description/name about the transaction
   transactionDescription: String, // detailed information about the transaction
@@ -56,15 +57,18 @@ const transformTransactionFields = (doc, ret, options) => {
   ret.id = ret._id;
   if (ret.totalValue) {
     ret.transactionValue = ret.totalValue;
-    delete ret.totalValue;
+    // delete ret.totalValue;
   }
   if (ret.itemDescription) {
     ret.transactionDescription = ret.itemDescription;
-    delete ret.itemDescription;
+    // delete ret.itemDescription;
   }
   if (ret.itemName) {
     ret.transactionName = ret.itemName;
-    delete ret.itemName;
+    // delete ret.itemName;
+  }
+  if (!ret.paymentMethod) {
+    ret.paymentMethod = paymentMethodAdapter(ret);
   }
   if (!ret.transactionLocation) {
     ret.transactionLocation = 'other';
