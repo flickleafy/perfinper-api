@@ -1,13 +1,18 @@
+import { paymentMethodAdapter } from './paymenthMethodAdapter.js';
+
 export function transactionPrototype(body) {
   const {
     transactionDate,
     transactionPeriod,
     transactionSource,
     transactionValue,
+    totalValue, // deprecated field
     transactionName,
-    transactionInstallments,
+    itemName, // deprecated field
+    transactionInstallments, // deprecated field
     installments,
     transactionDescription,
+    itemDescription, // deprecated field
     transactionFiscalNote,
     transactionId,
     transactionStatus,
@@ -26,19 +31,19 @@ export function transactionPrototype(body) {
     transactionDate,
     transactionPeriod,
     transactionSource,
-    transactionValue,
-    transactionName,
+    transactionValue: transactionValue || totalValue,
+    transactionName: transactionName || itemName,
     transactionInstallments,
     installments,
-    transactionDescription,
-    transactionFiscalNote,
+    transactionDescription: transactionDescription || itemDescription,
+    transactionFiscalNote: transactionFiscalNote || '',
     transactionId,
     transactionStatus,
-    transactionLocation,
+    transactionLocation: transactionLocation || 'other',
     transactionType,
     transactionCategory,
     freightValue,
-    paymentMethod,
+    paymentMethod: paymentMethod || paymentMethodAdapter(body),
     items,
     companyName,
     companySellerName,
