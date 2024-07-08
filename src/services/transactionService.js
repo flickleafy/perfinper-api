@@ -6,6 +6,7 @@ import {
   findAllInYear,
   updateById,
   deleteById,
+  separateById,
   deleteAllInPeriod,
   findPeriods,
   findYears,
@@ -90,6 +91,22 @@ export const deleteTransactionById = async (req, res) => {
     res
       .status(500)
       .send({ message: 'Nao foi possivel deletar a transaction: ' + id });
+  }
+};
+
+export const separateTransactionById = async (req, res) => {
+  const id = req.params.id;
+  try {
+    const transaction = await separateById(id);
+    if (!transaction) {
+      return res.status(404).send({ message: 'Transaction não encontrada' });
+    } else {
+      res.send({ message: 'Transaction separada com sucesso' });
+    }
+  } catch (error) {
+    res.status(500).send({
+      message: error.message || 'Algum erro ocorreu ao separar transaction',
+    });
   }
 };
 
