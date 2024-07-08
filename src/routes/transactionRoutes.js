@@ -4,6 +4,7 @@ import {
   findTransactionById,
   updateTransactionById,
   deleteTransactionById,
+  separateTransactionById,
   findAllTransactionsInPeriod,
   removeAllTransactionsInPeriod,
   findUniquePeriods,
@@ -16,6 +17,7 @@ transactionRouter.post('/', insertTransaction);
 transactionRouter.get('/:id', findTransactionById);
 transactionRouter.put('/:id', updateTransactionById);
 transactionRouter.delete('/:id', deleteTransactionById);
+transactionRouter.post('/separate/:id', separateTransactionById);
 
 transactionRouter.get(
   '/period/:transactionPeriod',
