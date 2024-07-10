@@ -1,4 +1,5 @@
 import TransactionModel from '../models/TransactionModel.js';
+import { startSession } from 'mongoose';
 
 export async function findPeriods() {
   try {
@@ -50,13 +51,20 @@ export async function deleteAllInPeriod(period) {
   }
 }
 
-export async function deleteById(id) {
+export async function deleteById(id, session = null) {
   try {
-    const deletedTransaction = await TransactionModel.findByIdAndDelete(id);
-    if (!deletedTransaction) {
-      throw new Error('No transaction found with the given ID.');
+    let transaction;
+    if (session) {
+      transaction = await TransactionModel.findByIdAndDelete(id, {
+        session,
+      });
+    } else {
+      transaction = await TransactionModel.findByIdAndDelete(id);
     }
-    return deletedTransaction;
+    if (!transaction) {
+      return null;
+    }
+    return transaction;
   } catch (error) {
     console.error('Error in deleteById:', error.message);
     throw new Error('An error occurred while deleting the transaction by ID.');
@@ -97,7 +105,7 @@ export async function updateById(id, transactionObject) {
       { new: true }
     );
     if (!updatedTransaction) {
-      throw new Error('No transaction found with the given ID.');
+      return null;
     }
     return updatedTransaction;
   } catch (error) {
@@ -131,11 +139,16 @@ export async function findAllInYear(year) {
   }
 }
 
-export async function findById(id) {
+export async function findById(id, session = null) {
   try {
-    const transaction = await TransactionModel.findById(id);
+    let transaction;
+    if (session) {
+      transaction = await TransactionModel.findById(id, { session });
+    } else {
+      transaction = await TransactionModel.findById(id);
+    }
     if (!transaction) {
-      throw new Error('No transaction found with the given ID.');
+      return null;
     }
     return transaction;
   } catch (error) {
@@ -144,14 +157,56 @@ export async function findById(id) {
   }
 }
 
-export async function insert(transactionObject) {
+export async function insert(transactionObject, session = null) {
   try {
     const transaction = new TransactionModel(transactionObject);
-    await transaction.save();
+    if (session) {
+      await transaction.save({ session });
+    } else {
+      await transaction.save();
+    }
     return transaction;
   } catch (error) {
     console.error('Error in insert:', error.message);
     throw new Error('An error occurred while inserting the transaction.');
+  }
+}
+
+export async function separateById(id) {
+  const session = await startSession();
+  try {
+    session.startTransaction();
+    const transaction = await findById(id);
+    const { items } = transaction;
+
+    if (!items || items.length < 2) {
+      throw new Error('Cannot separate transaction; too few items.');
+    }
+
+    const transactionPrototype = { ...transaction.toObject(), items: [] };
+
+    for (const [index, item] of items.entries()) {
+      const transactionCopy = { ...transactionPrototype, items: [item] };
+      transactionCopy.transactionDescription += ` - item ${index + 1}`;
+
+      const result = await insert(transactionCopy, session);
+      if (!result.id) {
+        throw new Error(
+          `Failed to create separated transaction for item ${index + 1}.`
+        );
+      }
+    }
+
+    await deleteById(transaction.id, session);
+
+    await session.commitTransaction();
+    return transaction;
+  } catch (error) {
+    await session.abortTransaction();
+    console.error('Error in separateById:', error.message);
+    throw new Error('Failed to separate transactions by ID.');
+  } finally {
+    session.endSession();
   }
 }
 
