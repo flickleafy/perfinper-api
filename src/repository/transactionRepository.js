@@ -188,6 +188,7 @@ export async function separateById(id) {
     for (const [index, item] of items.entries()) {
       const transactionCopy = { ...transactionPrototype, items: [item] };
       transactionCopy.transactionDescription += ` - item ${index + 1}`;
+      transactionCopy.transactionValue = item.itemValue;
 
       const result = await insert(transactionCopy, session);
       if (!result.id) {
