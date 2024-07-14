@@ -55,15 +55,15 @@ const transactionSchema = mongoose.Schema({
 
 const transformTransactionFields = (doc, ret, options) => {
   ret.id = ret._id;
-  if (ret.totalValue) {
+  if (!ret.transactionValue) {
     ret.transactionValue = ret.totalValue;
     // delete ret.totalValue;
   }
-  if (ret.itemDescription) {
+  if (!ret.transactionDescription) {
     ret.transactionDescription = ret.itemDescription;
     // delete ret.itemDescription;
   }
-  if (ret.itemName) {
+  if (!ret.transactionName) {
     ret.transactionName = ret.itemName;
     // delete ret.itemName;
   }
