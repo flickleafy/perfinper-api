@@ -1,6 +1,7 @@
 import { paymentMethodAdapter } from './paymenthMethodAdapter.js';
 
 export function transactionPrototype(body) {
+  body = JSON.parse(JSON.stringify(body));
   const {
     transactionDate,
     transactionPeriod,
@@ -31,11 +32,13 @@ export function transactionPrototype(body) {
     transactionDate,
     transactionPeriod,
     transactionSource,
-    transactionValue: transactionValue || totalValue,
-    transactionName: transactionName || itemName,
+    transactionValue: transactionValue ? transactionValue : totalValue,
+    transactionName: transactionName ? transactionName : itemName,
     transactionInstallments,
     installments,
-    transactionDescription: transactionDescription || itemDescription,
+    transactionDescription: transactionDescription
+      ? transactionDescription
+      : itemDescription,
     transactionFiscalNote: transactionFiscalNote || '',
     transactionId,
     transactionStatus,
