@@ -51,6 +51,11 @@ const transactionSchema = mongoose.Schema({
   companyName: String, // company name
   companySellerName: String, // seller name from the company
   companyCnpj: { type: String, index: true }, // company identification key
+  companyId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'company',
+    index: true,
+  }, // reference to Company collection
 });
 
 const transformTransactionFields = (doc, ret, options) => {

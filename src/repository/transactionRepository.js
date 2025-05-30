@@ -1,6 +1,26 @@
 import TransactionModel from '../models/TransactionModel.js';
 import { startSession } from 'mongoose';
 
+export async function findAll() {
+  try {
+    return await TransactionModel.find().sort({ transactionDate: 1 });
+  } catch (error) {
+    console.error('Error in findAll:', error.message);
+    throw new Error('Failed to retrieve all transactions.');
+  }
+}
+
+export async function findAllWithCompanyCnpj() {
+  try {
+    return await TransactionModel.find({
+      companyCnpj: { $exists: true, $nin: [null, '', undefined] },
+    }).sort({ transactionDate: 1 });
+  } catch (error) {
+    console.error('Error in findAllWithCompanyCnpj:', error.message);
+    throw new Error('Failed to retrieve transactions with company CNPJ.');
+  }
+}
+
 export async function findPeriods() {
   try {
     return await TransactionModel.distinct('transactionPeriod');
@@ -97,13 +117,22 @@ export async function deleteByIds(ids) {
   }
 }
 
-export async function updateById(id, transactionObject) {
+export async function updateById(id, transactionObject, session = null) {
   try {
-    const updatedTransaction = await TransactionModel.findByIdAndUpdate(
-      id,
-      transactionObject,
-      { new: true }
-    );
+    let updatedTransaction;
+    if (session) {
+      updatedTransaction = await TransactionModel.findByIdAndUpdate(
+        id,
+        transactionObject,
+        { new: true, session }
+      );
+    } else {
+      updatedTransaction = await TransactionModel.findByIdAndUpdate(
+        id,
+        transactionObject,
+        { new: true }
+      );
+    }
     if (!updatedTransaction) {
       return null;
     }
