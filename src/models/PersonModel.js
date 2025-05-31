@@ -118,21 +118,118 @@ const PersonSchema = new mongoose.Schema(
     profession: {
       type: String,
       trim: true,
-      comment: 'profissao - Profissão',
+      comment: 'profissao - Profissão principal',
     },
 
-    maritalStatus: {
-      type: String,
-      enum: ['single', 'married', 'divorced', 'widowed', 'other'],
-      comment:
-        'estadoCivil - Estado civil (solteiro, casado, divorciado, viúvo, outro)',
-    },
+    // Informações do negócio pessoal (Personal business information)
+    personalBusiness: {
+      hasPersonalBusiness: {
+        type: Boolean,
+        default: false,
+        comment:
+          'temNegocioProprio - Indica se a pessoa possui negócio próprio',
+      },
 
-    // Informações financeiras (Financial information)
-    monthlyIncome: {
-      type: Number,
-      min: 0,
-      comment: 'rendaMensal - Renda mensal',
+      businessType: {
+        type: String,
+        enum: [
+          'taxi',
+          'uber',
+          'delivery',
+          'freelancer',
+          'consultant',
+          'teacher',
+          'tutor',
+          'hairdresser',
+          'mechanic',
+          'electrician',
+          'plumber',
+          'carpenter',
+          'painter',
+          'cleaner',
+          'gardener',
+          'street_vendor',
+          'food_vendor',
+          'artisan',
+          'photographer',
+          'musician',
+          'artist',
+          'writer',
+          'translator',
+          'developer',
+          'designer',
+          'other',
+        ],
+        comment: 'tipoNegocio - Tipo de negócio informal/pessoal',
+      },
+
+      businessName: {
+        type: String,
+        trim: true,
+        comment: 'nomeNegocio - Nome fantasia do negócio',
+      },
+
+      businessDescription: {
+        type: String,
+        trim: true,
+        comment: 'descricaoNegocio - Descrição detalhada da atividade',
+      },
+
+      businessCategory: {
+        type: String,
+        enum: [
+          'transport',
+          'education',
+          'beauty',
+          'construction',
+          'maintenance',
+          'food_service',
+          'retail',
+          'services',
+          'technology',
+          'arts',
+          'health',
+          'consulting',
+          'other',
+        ],
+        comment: 'categoriaNegocio - Categoria do negócio',
+      },
+
+      isFormalized: {
+        type: Boolean,
+        default: false,
+        comment: 'ehFormalizado - Se o negócio é formalizado (MEI, etc.)',
+      },
+
+      mei: {
+        type: String,
+        trim: true,
+        comment: 'mei - Número do MEI (Microempreendedor Individual)',
+      },
+
+      workingHours: {
+        type: String,
+        trim: true,
+        comment: 'horarioTrabalho - Horário de funcionamento',
+      },
+
+      serviceArea: {
+        type: String,
+        trim: true,
+        comment: 'areaAtendimento - Área geográfica de atendimento',
+      },
+
+      averageMonthlyRevenue: {
+        type: Number,
+        min: 0,
+        comment: 'faturamentoMedio - Faturamento médio mensal',
+      },
+
+      businessNotes: {
+        type: String,
+        trim: true,
+        comment: 'observacoesNegocio - Observações sobre o negócio',
+      },
     },
 
     bankAccounts: [
@@ -213,6 +310,20 @@ PersonSchema.index({ 'address.city': 1 });
 PersonSchema.index({ 'address.state': 1 });
 PersonSchema.index({ status: 1 });
 PersonSchema.index({ createdAt: -1 });
+
+// Personal business indexes
+PersonSchema.index({ 'personalBusiness.hasPersonalBusiness': 1 });
+PersonSchema.index({ 'personalBusiness.businessType': 1 });
+PersonSchema.index({ 'personalBusiness.businessCategory': 1 });
+PersonSchema.index({ 'personalBusiness.isFormalized': 1 });
+PersonSchema.index({
+  'personalBusiness.hasPersonalBusiness': 1,
+  'personalBusiness.businessType': 1,
+});
+PersonSchema.index({
+  'personalBusiness.hasPersonalBusiness': 1,
+  'personalBusiness.businessCategory': 1,
+});
 
 // Middleware para atualizar updatedAt (Middleware to update updatedAt)
 PersonSchema.pre('save', function (next) {

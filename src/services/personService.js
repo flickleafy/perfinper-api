@@ -6,6 +6,13 @@ import {
   findByName,
   findByStatus,
   findByCity,
+  findByBusinessType,
+  findByBusinessCategory,
+  findWithPersonalBusiness,
+  findFormalizedBusinesses,
+  findInformalBusinesses,
+  getDistinctBusinessTypes,
+  getDistinctBusinessCategories,
   findAll,
   updateById,
   updateByCpf,
@@ -210,6 +217,111 @@ export const getPersonCount = async (req, res) => {
     res.send({ count: totalCount });
   } catch (error) {
     logger.error('Error getting person count:', error);
+    res.status(500).send({ message: 'Internal server error' });
+  }
+};
+
+/**
+ * Find people by business type
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+export const findPeopleByBusinessType = async (req, res) => {
+  try {
+    const people = await findByBusinessType(req.params.businessType);
+    res.send(people);
+  } catch (error) {
+    logger.error('Error finding people by business type:', error);
+    res.status(500).send({ message: 'Internal server error' });
+  }
+};
+
+/**
+ * Find people by business category
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+export const findPeopleByBusinessCategory = async (req, res) => {
+  try {
+    const people = await findByBusinessCategory(req.params.businessCategory);
+    res.send(people);
+  } catch (error) {
+    logger.error('Error finding people by business category:', error);
+    res.status(500).send({ message: 'Internal server error' });
+  }
+};
+
+/**
+ * Find people with personal business
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+export const findPeopleWithPersonalBusiness = async (req, res) => {
+  try {
+    const people = await findWithPersonalBusiness();
+    res.send(people);
+  } catch (error) {
+    logger.error('Error finding people with personal business:', error);
+    res.status(500).send({ message: 'Internal server error' });
+  }
+};
+
+/**
+ * Find formalized businesses (MEI)
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+export const findPeopleFormalizedBusinesses = async (req, res) => {
+  try {
+    const people = await findFormalizedBusinesses();
+    res.send(people);
+  } catch (error) {
+    logger.error('Error finding formalized businesses:', error);
+    res.status(500).send({ message: 'Internal server error' });
+  }
+};
+
+/**
+ * Find informal businesses (not MEI)
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+export const findPeopleInformalBusinesses = async (req, res) => {
+  try {
+    const people = await findInformalBusinesses();
+    res.send(people);
+  } catch (error) {
+    logger.error('Error finding informal businesses:', error);
+    res.status(500).send({ message: 'Internal server error' });
+  }
+};
+
+/**
+ * Get distinct business types
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+export const getPersonDistinctBusinessTypes = async (req, res) => {
+  try {
+    const businessTypes = await getDistinctBusinessTypes();
+    res.send(businessTypes);
+  } catch (error) {
+    logger.error('Error getting distinct business types:', error);
+    res.status(500).send({ message: 'Internal server error' });
+  }
+};
+
+/**
+ * Get distinct business categories
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+export const getPersonDistinctBusinessCategories = async (req, res) => {
+  try {
+    const businessCategories = await getDistinctBusinessCategories();
+    res.send(businessCategories);
+  } catch (error) {
+    logger.error('Error getting distinct business categories:', error);
     res.status(500).send({ message: 'Internal server error' });
   }
 };
