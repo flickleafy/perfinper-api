@@ -17,16 +17,22 @@
     "winston-mongodb": "^5.1.1"
   },
   "devDependencies": {
+    "@jest/globals": "30.0.0-beta.3",
     "@types/cors": "^2.8.12",
     "@types/dotenv": "^8.2.0",
     "@types/express": "^4.17.21",
     "@types/mongoose": "^5.11.97",
     "@types/winston": "^2.4.4",
+    "jest": "29.7.0",
     "nodemon": "^3.1.0"
   },
   "scripts": {
     "start": "nodemon src/index.js",
-    "prod": "node src/index.js"
+    "prod": "node src/index.js",
+    "test": "NODE_OPTIONS='--experimental-vm-modules' jest --runInBand",
+    "test:watch": "NODE_OPTIONS='--experimental-vm-modules' jest --watch --runInBand",
+    "test:coverage": "NODE_OPTIONS='--experimental-vm-modules' jest --coverage --runInBand",
+    "test:migration": "NODE_OPTIONS='--experimental-vm-modules' jest src/services/migrationService/migrateCompanyDataToCompanyCollection/__tests__ --runInBand"
   },
   "nodemonConfig": {
     "ignore": [
