@@ -193,6 +193,131 @@ async function findByStatus(status, session = null) {
 }
 
 /**
+ * Find people by business type
+ * @param {string} businessType - Business type to search for
+ * @param {Object} session - MongoDB session for transactions
+ * @returns {Promise<Array>} Array of person documents
+ */
+async function findByBusinessType(businessType, session = null) {
+  const query = PersonModel.find({
+    'personalBusiness.businessType': businessType,
+    'personalBusiness.hasPersonalBusiness': true,
+  });
+
+  if (session) {
+    query.session(session);
+  }
+
+  return await query.exec();
+}
+
+/**
+ * Find people by business category
+ * @param {string} businessCategory - Business category to search for
+ * @param {Object} session - MongoDB session for transactions
+ * @returns {Promise<Array>} Array of person documents
+ */
+async function findByBusinessCategory(businessCategory, session = null) {
+  const query = PersonModel.find({
+    'personalBusiness.businessCategory': businessCategory,
+    'personalBusiness.hasPersonalBusiness': true,
+  });
+
+  if (session) {
+    query.session(session);
+  }
+
+  return await query.exec();
+}
+
+/**
+ * Find people with personal business
+ * @param {Object} session - MongoDB session for transactions
+ * @returns {Promise<Array>} Array of person documents
+ */
+async function findWithPersonalBusiness(session = null) {
+  const query = PersonModel.find({
+    'personalBusiness.hasPersonalBusiness': true,
+  });
+
+  if (session) {
+    query.session(session);
+  }
+
+  return await query.exec();
+}
+
+/**
+ * Find formalized businesses (MEI)
+ * @param {Object} session - MongoDB session for transactions
+ * @returns {Promise<Array>} Array of person documents
+ */
+async function findFormalizedBusinesses(session = null) {
+  const query = PersonModel.find({
+    'personalBusiness.hasPersonalBusiness': true,
+    'personalBusiness.isFormalized': true,
+  });
+
+  if (session) {
+    query.session(session);
+  }
+
+  return await query.exec();
+}
+
+/**
+ * Find informal businesses (not MEI)
+ * @param {Object} session - MongoDB session for transactions
+ * @returns {Promise<Array>} Array of person documents
+ */
+async function findInformalBusinesses(session = null) {
+  const query = PersonModel.find({
+    'personalBusiness.hasPersonalBusiness': true,
+    'personalBusiness.isFormalized': false,
+  });
+
+  if (session) {
+    query.session(session);
+  }
+
+  return await query.exec();
+}
+
+/**
+ * Get distinct business types
+ * @param {Object} session - MongoDB session for transactions
+ * @returns {Promise<Array>} Array of distinct business types
+ */
+async function getDistinctBusinessTypes(session = null) {
+  const query = PersonModel.distinct('personalBusiness.businessType', {
+    'personalBusiness.hasPersonalBusiness': true,
+  });
+
+  if (session) {
+    query.session(session);
+  }
+
+  return await query.exec();
+}
+
+/**
+ * Get distinct business categories
+ * @param {Object} session - MongoDB session for transactions
+ * @returns {Promise<Array>} Array of distinct business categories
+ */
+async function getDistinctBusinessCategories(session = null) {
+  const query = PersonModel.distinct('personalBusiness.businessCategory', {
+    'personalBusiness.hasPersonalBusiness': true,
+  });
+
+  if (session) {
+    query.session(session);
+  }
+
+  return await query.exec();
+}
+
+/**
  * Get statistics about people
  * @param {Object} session - MongoDB session for transactions
  * @returns {Promise<Object>} Statistics object
@@ -212,6 +337,43 @@ async function getStatistics(session = null) {
         blocked: {
           $sum: { $cond: [{ $eq: ['$status', 'blocked'] }, 1, 0] },
         },
+        withPersonalBusiness: {
+          $sum: {
+            $cond: [
+              { $eq: ['$personalBusiness.hasPersonalBusiness', true] },
+              1,
+              0,
+            ],
+          },
+        },
+        formalizedBusinesses: {
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  { $eq: ['$personalBusiness.hasPersonalBusiness', true] },
+                  { $eq: ['$personalBusiness.isFormalized', true] },
+                ],
+              },
+              1,
+              0,
+            ],
+          },
+        },
+        informalBusinesses: {
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  { $eq: ['$personalBusiness.hasPersonalBusiness', true] },
+                  { $eq: ['$personalBusiness.isFormalized', false] },
+                ],
+              },
+              1,
+              0,
+            ],
+          },
+        },
       },
     },
   ];
@@ -230,6 +392,9 @@ async function getStatistics(session = null) {
       active: 0,
       inactive: 0,
       blocked: 0,
+      withPersonalBusiness: 0,
+      formalizedBusinesses: 0,
+      informalBusinesses: 0,
     }
   );
 }
@@ -241,6 +406,13 @@ export {
   findByName,
   findByCity,
   findByStatus,
+  findByBusinessType,
+  findByBusinessCategory,
+  findWithPersonalBusiness,
+  findFormalizedBusinesses,
+  findInformalBusinesses,
+  getDistinctBusinessTypes,
+  getDistinctBusinessCategories,
   insert,
   updateById,
   updateByCpf,
