@@ -124,6 +124,22 @@ async function processTransactionWithSession(
   const documentInfo = identifyDocumentType(entityIdentifier);
 
   if (!documentInfo.isValid) {
+    // Check if it could be an anonymized CPF (common for privacy reasons)
+    if (isAnonymizedCPF(entityIdentifier)) {
+      console.log(`🔒 Processing anonymized CPF: ${entityIdentifier}`);
+
+      // Skip if already processed in this migration
+      if (processedEntities.has(entityIdentifier)) {
+        return { created: 0, skipped: 0, updated: 0 };
+      }
+
+      return await processAnonymousPersonTransaction(
+        transaction,
+        processedEntities,
+        session
+      );
+    }
+
     console.log(`⚠️ Invalid document identifier: ${entityIdentifier}`);
     return { created: 0, skipped: 0, updated: 0 };
   }
@@ -258,6 +274,152 @@ async function processPersonTransaction(
   }
 
   return { created: 0, skipped: 0, updated: 0 };
+}
+
+/**
+ * Processes anonymous person transactions (anonymized CPF)
+ * @param {Object} transaction - Transaction to process
+ * @param {Map} processedEntities - Map of already processed entities
+ * @param {Object} session - MongoDB session for transaction
+ * @returns {Object} Result with created/skipped/updated counts
+ */
+async function processAnonymousPersonTransaction(
+  transaction,
+  processedEntities,
+  session
+) {
+  const personIdentifier = getEntityIdentifier(transaction);
+
+  // Check if anonymous person already exists
+  const existingPerson = await findExistingAnonymousPersonWithSession(
+    transaction,
+    session
+  );
+
+  if (existingPerson) {
+    console.log(
+      `✅ Anonymous person already exists: ${existingPerson.fullName}`
+    );
+    // Update transaction with personId if not already set
+    const updateResult = await updateTransactionWithPersonIdSession(
+      transaction,
+      existingPerson.id,
+      session
+    );
+    processedEntities.set(personIdentifier, true);
+    return { created: 0, skipped: 1, updated: updateResult ? 1 : 0 };
+  }
+
+  // Create new anonymous person
+  const newPersonData = createAnonymousPersonFromTransaction(transaction);
+  if (newPersonData) {
+    const createdPerson = await insertPersonWithSession(newPersonData, session);
+    console.log(`🆕 Created anonymous person: ${newPersonData.fullName}`);
+    // Update transaction with the new personId
+    const updateResult = await updateTransactionWithPersonIdSession(
+      transaction,
+      createdPerson.id,
+      session
+    );
+    processedEntities.set(personIdentifier, true);
+    return { created: 1, skipped: 0, updated: updateResult ? 1 : 0 };
+  }
+
+  return { created: 0, skipped: 0, updated: 0 };
+}
+
+/**
+ * Checks if a document identifier could be an anonymized CPF
+ * Common patterns: ***.123.456-**, 123.***.*89-**, etc.
+ * @param {string} identifier - Document identifier to check
+ * @returns {boolean} True if it looks like an anonymized CPF
+ */
+function isAnonymizedCPF(identifier) {
+  if (!identifier || typeof identifier !== 'string') {
+    return false;
+  }
+
+  const cleanIdentifier = identifier.replace(/\D/g, '');
+
+  // Check if it has CPF-like length (11 digits) but contains anonymization patterns
+  const originalIdentifier = identifier.trim();
+
+  // Common anonymization patterns
+  const anonymizationPatterns = [
+    /\*{3,}/, // Three or more asterisks
+    /x{3,}/i, // Three or more x's (case insensitive)
+    /##+/, // Hash symbols
+    /\.{3,}/, // Multiple dots beyond normal CPF formatting
+    /\d{1,3}[\*x#\.]{3,}\d{1,3}/i, // Digits-anonymization-digits pattern
+  ];
+
+  // Check if it matches anonymization patterns and has reasonable length
+  const hasAnonymizationPattern = anonymizationPatterns.some((pattern) =>
+    pattern.test(originalIdentifier)
+  );
+
+  // Should have some structure suggesting it's a CPF (between 8-15 chars when including formatting)
+  const hasReasonableLength =
+    originalIdentifier.length >= 8 && originalIdentifier.length <= 15;
+
+  // Should contain some digits
+  const hasDigits = /\d/.test(originalIdentifier);
+
+  return hasAnonymizationPattern && hasReasonableLength && hasDigits;
+}
+
+/**
+ * Finds existing anonymous person by anonymized identifier
+ * @param {Object} transaction - Transaction with anonymized CPF data
+ * @param {Object} session - MongoDB session
+ * @returns {Object|null} Existing anonymous person or null
+ */
+async function findExistingAnonymousPersonWithSession(transaction, session) {
+  if (transaction.companyCnpj) {
+    // For anonymous persons, we search by the anonymized CPF directly
+    return await findByCpf(transaction.companyCnpj, session);
+  }
+  return null;
+}
+
+/**
+ * Creates anonymous person data from transaction with anonymized CPF
+ * @param {Object} transaction - Transaction containing anonymized person data
+ * @returns {Object|null} Anonymous person data object or null
+ */
+function createAnonymousPersonFromTransaction(transaction) {
+  if (!transaction.companyCnpj) {
+    return null;
+  }
+
+  const personData = {
+    fullName:
+      transaction.companyName ||
+      transaction.companySellerName ||
+      'Pessoa Anônima',
+    cpf: transaction.companyCnpj, // Keep the anonymized CPF as-is
+    status: 'anonymous', // Special status for anonymized persons
+    notes: 'Pessoa criada a partir de CPF anonimizado em transação',
+    sourceTransaction: transaction._id,
+
+    // Mark as having limited data due to anonymization
+    personalBusiness: {
+      hasPersonalBusiness: false, // Cannot determine business info from anonymized data
+    },
+
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  // Add seller name as additional info if different from company name
+  if (
+    transaction.companySellerName &&
+    transaction.companySellerName !== transaction.companyName
+  ) {
+    personData.notes += `. Vendedor: ${transaction.companySellerName}`;
+  }
+
+  return personData;
 }
 
 /**
