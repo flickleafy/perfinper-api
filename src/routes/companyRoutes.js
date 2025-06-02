@@ -1,47 +1,67 @@
 import express from 'express';
 import {
-  getAllCompanies,
-  getCompanyById,
-  getCompaniesByCnpj,
-  getCompaniesByName,
-  getCompaniesByStatus,
-  getCompaniesByCity,
-  getCompaniesByState,
-  getCompaniesByActivity,
+  findAllCompanies,
+  findCompanyById,
+  findCompanyByCnpj,
+  findCompaniesByName,
+  findCompaniesByStatus,
+  findCompaniesByCity,
+  findCompaniesByState,
+  findCompaniesByPrimaryActivityCode,
+  findCompaniesBySecondaryActivityCode,
+  findCompaniesByType,
   createCompany,
-  updateCompany,
-  deleteCompany,
-  bulkCreateCompanies,
-  bulkUpdateCompanies,
-  getCompanyStatistics,
-  getCompaniesCount,
-  searchCompanies,
+  updateCompanyById,
+  updateCompanyByCnpj,
+  upsertCompanyByCnpj,
+  deleteCompanyById,
+  deleteCompanyByCnpj,
+  deleteCompaniesByIds,
+  getOverallCompanyStatistics,
+  findUniqueStates,
+  findUniqueCities,
+  findUniqueCompanyTypes,
+  findCompaniesWithoutCnpj,
+  updateCompanyStatistics,
 } from '../services/companyService.js';
 
 const router = express.Router();
 
 // GET routes
-router.get('/', getAllCompanies);
-router.get('/search', searchCompanies);
-router.get('/statistics', getCompanyStatistics);
-router.get('/count', getCompaniesCount);
-router.get('/cnpj/:cnpj', getCompaniesByCnpj);
-router.get('/name/:name', getCompaniesByName);
-router.get('/status/:status', getCompaniesByStatus);
-router.get('/city/:city', getCompaniesByCity);
-router.get('/state/:state', getCompaniesByState);
-router.get('/activity/:activity', getCompaniesByActivity);
-router.get('/:id', getCompanyById);
+router.get('/', findAllCompanies);
+router.get('/statistics', getOverallCompanyStatistics);
+router.get('/cnpj/:cnpj', findCompanyByCnpj);
+router.get('/name/:name', findCompaniesByName);
+router.get('/status/:status', findCompaniesByStatus);
+router.get('/city/:city', findCompaniesByCity);
+router.get('/state/:state', findCompaniesByState);
+router.get('/type/:type', findCompaniesByType);
+router.get(
+  '/activity/primary/:activityCode',
+  findCompaniesByPrimaryActivityCode
+);
+router.get(
+  '/activity/secondary/:activityCode',
+  findCompaniesBySecondaryActivityCode
+);
+router.get('/meta/states', findUniqueStates);
+router.get('/meta/cities', findUniqueCities);
+router.get('/meta/types', findUniqueCompanyTypes);
+router.get('/query/without-cnpj', findCompaniesWithoutCnpj);
+router.get('/:id', findCompanyById);
 
 // POST routes
 router.post('/', createCompany);
-router.post('/bulk', bulkCreateCompanies);
+router.post('/upsert/cnpj/:cnpj', upsertCompanyByCnpj);
+router.post('/delete/batch', deleteCompaniesByIds);
 
 // PUT routes
-router.put('/bulk', bulkUpdateCompanies);
-router.put('/:id', updateCompany);
+router.put('/:id', updateCompanyById);
+router.put('/cnpj/:cnpj', updateCompanyByCnpj);
+router.put('/statistics/cnpj/:cnpj', updateCompanyStatistics);
 
 // DELETE routes
-router.delete('/:id', deleteCompany);
+router.delete('/:id', deleteCompanyById);
+router.delete('/cnpj/:cnpj', deleteCompanyByCnpj);
 
 export default router;

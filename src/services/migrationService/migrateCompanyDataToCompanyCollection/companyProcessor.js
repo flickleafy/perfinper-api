@@ -11,6 +11,12 @@ import {
 import { CompanyAdapter } from './entityAdapters.js';
 import { TransactionUpdater } from './transactionUpdater.js';
 import { EMPTY_RESULT } from './types.js';
+import {
+  addExistingEntity,
+  incrementTransactionUpdates,
+  addCnpjRecord,
+  addFailedRecord,
+} from './dryRunUtils.js';
 
 /**
  * Company Processor class
@@ -22,9 +28,17 @@ export class CompanyProcessor {
    * @param {Object} transaction - Transaction to process
    * @param {Map} processedEntities - Map of already processed entities
    * @param {Object} session - MongoDB session for transaction
+   * @param {boolean} dryRun - Whether this is a dry-run execution
+   * @param {Object} dryRunStats - Statistics collector for dry-run mode
    * @returns {Object} Result with created/skipped/updated counts
    */
-  static async process(transaction, processedEntities, session) {
+  static async process(
+    transaction,
+    processedEntities,
+    session,
+    dryRun = false,
+    dryRunStats = null
+  ) {
     const companyIdentifier = transaction.companyCnpj;
 
     try {
@@ -38,12 +52,28 @@ export class CompanyProcessor {
           }`
         );
 
-        // Update transaction with companyId if not already set
-        const updateResult = await TransactionUpdater.updateWithCompanyId(
-          transaction,
-          existingCompany.id,
-          session
-        );
+        // Track existing entity for dry-run
+        if (dryRun && dryRunStats) {
+          addExistingEntity(
+            dryRunStats,
+            companyIdentifier,
+            existingCompany,
+            'company'
+          );
+          incrementTransactionUpdates(dryRunStats);
+        }
+
+        // Update transaction with companyId if not already set (skip in dry-run)
+        let updateResult = false;
+        if (!dryRun) {
+          updateResult = await TransactionUpdater.updateWithCompanyId(
+            transaction,
+            existingCompany.id,
+            session
+          );
+        } else {
+          updateResult = true; // Simulate successful update
+        }
 
         processedEntities.set(companyIdentifier, true);
         return { created: 0, skipped: 1, updated: updateResult ? 1 : 0 };
@@ -52,27 +82,53 @@ export class CompanyProcessor {
       // Create new company
       const newCompanyData = CompanyAdapter.fromTransaction(transaction);
       if (newCompanyData) {
-        const createdCompany = await this.create(newCompanyData, session);
-        console.log(
-          `🆕 Created company: ${
-            newCompanyData.corporateName || newCompanyData.tradeName
-          }`
-        );
+        if (dryRun) {
+          // Dry-run mode: just collect statistics
+          console.log(
+            `🧪 Would create company: ${
+              newCompanyData.corporateName || newCompanyData.tradeName
+            }`
+          );
 
-        // Update transaction with the new companyId
-        const updateResult = await TransactionUpdater.updateWithCompanyId(
-          transaction,
-          createdCompany.id,
-          session
-        );
+          if (dryRunStats) {
+            addCnpjRecord(
+              dryRunStats,
+              companyIdentifier,
+              newCompanyData,
+              transaction
+            );
+            incrementTransactionUpdates(dryRunStats);
+          }
+        } else {
+          // Regular mode: actually create the company
+          const createdCompany = await this.create(newCompanyData, session);
+          console.log(
+            `🆕 Created company: ${
+              newCompanyData.corporateName || newCompanyData.tradeName
+            }`
+          );
+
+          // Update transaction with the new companyId
+          await TransactionUpdater.updateWithCompanyId(
+            transaction,
+            createdCompany.id,
+            session
+          );
+        }
 
         processedEntities.set(companyIdentifier, true);
-        return { created: 1, skipped: 0, updated: updateResult ? 1 : 0 };
+        return { created: 1, skipped: 0, updated: 1 };
       }
 
       return EMPTY_RESULT;
     } catch (error) {
       console.error(`❌ Error processing company transaction:`, error.message);
+
+      // Track failed record for dry-run
+      if (dryRun && dryRunStats) {
+        addFailedRecord(dryRunStats, transaction, error.message);
+      }
+
       throw error;
     }
   }

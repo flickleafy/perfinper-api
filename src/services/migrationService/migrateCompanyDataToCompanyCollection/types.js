@@ -32,6 +32,35 @@ export const ENTITY_STATUS = {
  */
 
 /**
+ * Dry-run entity data structure
+ * @typedef {Object} DryRunEntity
+ * @property {string} identifier - Entity identifier (CNPJ/CPF)
+ * @property {string} name - Entity name
+ * @property {string} type - Entity type (company/person/anonymous)
+ * @property {Object} data - Complete entity data that would be created
+ * @property {string} source - Source transaction information
+ */
+
+/**
+ * Enhanced statistics for dry-run mode
+ * @typedef {Object} DryRunStats
+ * @property {boolean} isDryRun - Whether this was a dry-run execution
+ * @property {number} transactionsAnalyzed - Total transactions processed
+ * @property {Array<DryRunEntity>} cnpjRecords - Companies that would be created
+ * @property {Array<DryRunEntity>} cpfRecords - Persons that would be created
+ * @property {Array<DryRunEntity>} anonymousCpfRecords - Anonymous persons that would be created
+ * @property {Array<Object>} failedRecords - Transactions that failed processing
+ * @property {Array<Object>} existingEntities - Entities that already exist
+ * @property {number} companiesWouldCreate - Companies that would be created count
+ * @property {number} personsWouldCreate - Persons that would be created count
+ * @property {number} anonymousPersonsWouldCreate - Anonymous persons that would be created count
+ * @property {number} companiesExisting - Existing companies count
+ * @property {number} personsExisting - Existing persons count
+ * @property {number} transactionsWouldUpdate - Transactions that would be updated
+ * @property {number} uniqueEntitiesProcessed - Total unique entities processed
+ */
+
+/**
  * Migration statistics structure
  * @typedef {Object} MigrationStats
  * @property {boolean} success - Whether migration completed successfully
@@ -73,6 +102,7 @@ export const ANONYMIZATION_PATTERNS = [
   /##+/, // Hash symbols
   /\.{3,}/, // Multiple dots beyond normal CPF formatting
   /\d{1,3}[\*x#\.]{3,}\d{1,3}/i, // Digits-anonymization-digits pattern
+  /•{3}\.\d{3}\.\d{3}-•{2}/, // Pattern like •••.123.456-••
 ];
 
 /**
