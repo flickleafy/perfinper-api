@@ -81,46 +81,56 @@ export class CompanyProcessor {
 
       // Create new company
       const newCompanyData = CompanyAdapter.fromTransaction(transaction);
-      if (newCompanyData) {
-        if (dryRun) {
-          // Dry-run mode: just collect statistics
-          console.log(
-            `🧪 Would create company: ${
-              newCompanyData.corporateName || newCompanyData.tradeName
-            }`
-          );
-
-          if (dryRunStats) {
-            addCnpjRecord(
-              dryRunStats,
-              companyIdentifier,
-              newCompanyData,
-              transaction
-            );
-            incrementTransactionUpdates(dryRunStats);
-          }
-        } else {
-          // Regular mode: actually create the company
-          const createdCompany = await this.create(newCompanyData, session);
-          console.log(
-            `🆕 Created company: ${
-              newCompanyData.corporateName || newCompanyData.tradeName
-            }`
-          );
-
-          // Update transaction with the new companyId
-          await TransactionUpdater.updateWithCompanyId(
-            transaction,
-            createdCompany.id,
-            session
-          );
-        }
-
-        processedEntities.set(companyIdentifier, true);
-        return { created: 1, skipped: 0, updated: 1 };
+      if (!newCompanyData) {
+        return EMPTY_RESULT;
       }
 
-      return EMPTY_RESULT;
+      if (dryRun) {
+        // Dry-run mode: just collect statistics
+        console.log(
+          `🧪 Would create company: ${
+            newCompanyData.corporateName || newCompanyData.tradeName
+          }`
+        );
+        if (dryRunStats) {
+          addCnpjRecord(
+            dryRunStats,
+            companyIdentifier,
+            newCompanyData,
+            transaction
+          );
+          incrementTransactionUpdates(dryRunStats);
+        }
+        processedEntities.set(companyIdentifier, true);
+        return { created: 1, skipped: 0, updated: 1 }; // Simulate successful creation and update
+      }
+
+      // Regular mode: actually create the company
+      const createdCompany = await this.create(newCompanyData, session);
+
+      if (!createdCompany) {
+        console.warn(
+          `⚠️ Company creation returned null for CNPJ: ${companyIdentifier}, transaction not updated.`
+        );
+        processedEntities.set(companyIdentifier, true); // Mark as processed to avoid retries
+        return EMPTY_RESULT; // created: 0, skipped: 0, updated: 0
+      }
+
+      // Company creation was successful
+      console.log(
+        `🆕 Created company: ${
+          newCompanyData.corporateName || newCompanyData.tradeName
+        }`
+      );
+
+      const updateSuccessful = await TransactionUpdater.updateWithCompanyId(
+        transaction,
+        createdCompany.id, // Safe to access .id here
+        session
+      );
+
+      processedEntities.set(companyIdentifier, true);
+      return { created: 1, skipped: 0, updated: updateSuccessful ? 1 : 0 };
     } catch (error) {
       console.error(`❌ Error processing company transaction:`, error.message);
 
@@ -128,7 +138,6 @@ export class CompanyProcessor {
       if (dryRun && dryRunStats) {
         addFailedRecord(dryRunStats, transaction, error.message);
       }
-
       throw error;
     }
   }

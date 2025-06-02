@@ -1,6 +1,5 @@
 export default {
   // Use ES modules
-  preset: undefined,
   globals: {
     'ts-jest': {
       useESM: true,
@@ -16,7 +15,7 @@ export default {
   // Coverage configuration
   collectCoverage: true,
   coverageDirectory: 'coverage',
-  coverageReporters: ['text', 'lcov', 'html'],
+  coverageReporters: ['text', 'lcov', 'html', 'json-summary'],
   collectCoverageFrom: [
     'src/services/migrationService/**/*.js',
     '!src/services/migrationService/**/*.test.js',
@@ -24,13 +23,15 @@ export default {
   ],
 
   // Transform configuration for ES modules
-  transform: {},
+  transform: {
+    '^.+\\.m?js$': 'babel-jest',
+  },
 
   // Module file extensions
-  moduleFileExtensions: ['js', 'json'],
+  moduleFileExtensions: ['js', 'json', 'mjs'],
 
   // Transform ignore patterns
-  transformIgnorePatterns: ['node_modules/(?!(.*\\.mjs$))'],
+  transformIgnorePatterns: ['node_modules/(?!(.*\\.mjs$|@jest/globals))'],
 
   // Test timeout
   testTimeout: 30000,
