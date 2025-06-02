@@ -9,14 +9,14 @@ import { DOCUMENT_TYPES } from '../types.js';
 
 // Mock the external validator
 jest.unstable_mockModule(
-  '../../../infrasctructure/validators/index.js',
+  '../../../infrastructure/validators/index.js',
   () => ({
     identifyDocumentType: jest.fn(),
   })
 );
 
 const { identifyDocumentType } = await import(
-  '../../../infrasctructure/validators/index.js'
+  '../../../infrastructure/validators/index.js'
 );
 
 describe('DocumentValidator', () => {
