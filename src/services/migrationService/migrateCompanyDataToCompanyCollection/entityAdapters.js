@@ -18,7 +18,11 @@ export class CompanyAdapter {
    * @returns {Object|null} Company data object or null if insufficient data
    */
   static fromTransaction(transaction) {
-    if (!transaction.companyCnpj || transaction.companyCnpj.trim() === '') {
+    if (
+      !transaction ||
+      !transaction.companyCnpj ||
+      transaction.companyCnpj.trim() === ''
+    ) {
       return null;
     }
 

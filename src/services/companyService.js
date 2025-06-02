@@ -37,6 +37,18 @@ export const insertCompany = async (req, res) => {
   }
 };
 
+export const createCompany = async (req, res) => {
+  try {
+    const companyObject = req.body;
+    const company = await insert(companyObject);
+    res.status(201).send(company);
+  } catch (error) {
+    res.status(500).send({
+      message: error.message || 'Algum erro ocorreu ao criar a company',
+    });
+  }
+};
+
 export const findCompanyById = async (req, res) => {
   const id = req.params.id;
   try {

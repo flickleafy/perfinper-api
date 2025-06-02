@@ -22,9 +22,17 @@ export class AnonymousPersonProcessor {
    * @param {Object} transaction - Transaction to process
    * @param {Map} processedEntities - Map of already processed entities
    * @param {Object} session - MongoDB session for transaction
+   * @param {boolean} dryRun - Whether this is a dry-run execution
+   * @param {Object} dryRunStats - Statistics collector for dry-run mode
    * @returns {Object} Result with created/skipped/updated counts
    */
-  static async process(transaction, processedEntities, session) {
+  static async process(
+    transaction,
+    processedEntities,
+    session,
+    dryRun = false,
+    dryRunStats = null
+  ) {
     const personIdentifier = transaction.companyCnpj;
 
     try {
@@ -36,13 +44,30 @@ export class AnonymousPersonProcessor {
           `✅ Anonymous person already exists: ${existingPerson.fullName}`
         );
 
-        // Update transaction with personId if not already set
-        const updateResult =
-          await TransactionUpdater.updateWithAnonymousPersonId(
+        // Track existing entity for dry-run
+        if (dryRun && dryRunStats) {
+          const { addExistingEntity, incrementTransactionUpdates } =
+            await import('./dryRunUtils.js');
+          addExistingEntity(
+            dryRunStats,
+            personIdentifier,
+            existingPerson,
+            'anonymous'
+          );
+          incrementTransactionUpdates(dryRunStats);
+        }
+
+        // Update transaction with personId if not already set (skip in dry-run)
+        let updateResult = false;
+        if (!dryRun) {
+          updateResult = await TransactionUpdater.updateWithAnonymousPersonId(
             transaction,
             existingPerson.id,
             session
           );
+        } else {
+          updateResult = true; // Simulate successful update
+        }
 
         processedEntities.set(personIdentifier, true);
         return { created: 0, skipped: 1, updated: updateResult ? 1 : 0 };
@@ -51,19 +76,38 @@ export class AnonymousPersonProcessor {
       // Create new anonymous person
       const newPersonData = AnonymousPersonAdapter.fromTransaction(transaction);
       if (newPersonData) {
-        const createdPerson = await this.create(newPersonData, session);
-        console.log(`🆕 Created anonymous person: ${newPersonData.fullName}`);
+        if (dryRun) {
+          // Dry-run mode: just collect statistics
+          console.log(
+            `🧪 Would create anonymous person: ${newPersonData.fullName}`
+          );
 
-        // Update transaction with the new personId
-        const updateResult =
+          if (dryRunStats) {
+            const { addAnonymousCpfRecord, incrementTransactionUpdates } =
+              await import('./dryRunUtils.js');
+            addAnonymousCpfRecord(
+              dryRunStats,
+              personIdentifier,
+              newPersonData,
+              transaction
+            );
+            incrementTransactionUpdates(dryRunStats);
+          }
+        } else {
+          // Regular mode: actually create the anonymous person
+          const createdPerson = await this.create(newPersonData, session);
+          console.log(`🆕 Created anonymous person: ${newPersonData.fullName}`);
+
+          // Update transaction with the new personId
           await TransactionUpdater.updateWithAnonymousPersonId(
             transaction,
             createdPerson.id,
             session
           );
+        }
 
         processedEntities.set(personIdentifier, true);
-        return { created: 1, skipped: 0, updated: updateResult ? 1 : 0 };
+        return { created: 1, skipped: 0, updated: 1 };
       }
 
       return EMPTY_RESULT;
@@ -72,6 +116,13 @@ export class AnonymousPersonProcessor {
         `❌ Error processing anonymous person transaction:`,
         error.message
       );
+
+      // Track failed record for dry-run
+      if (dryRun && dryRunStats) {
+        const { addFailedRecord } = await import('./dryRunUtils.js');
+        addFailedRecord(dryRunStats, transaction, error.message);
+      }
+
       throw error;
     }
   }

@@ -61,7 +61,7 @@ const initialize = async () => {
   await connectDB();
   await initializeDatabase();
   await identifyAndUpdateCompanyFields();
-  await migrateCompanyDataToCompanyCollection();
+  await migrateCompanyDataToCompanyCollection(true);
 };
 
 initialize();

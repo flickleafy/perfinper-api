@@ -1,34 +1,51 @@
+/**
+ * Migration Service Orchestrator
+ * Main entry point for company and person data migration
+ * Coordinates all processors and follows the Strategy pattern for different document types
+ *
+ * Architecture:
+ * - DocumentValidator: Validates and identifies document types
+ * - CompanyProcessor: Handles CNPJ/company processing
+ * - PersonProcessor: Handles CPF/person processing
+ * - AnonymousPersonProcessor: Handles anonymized CPF processing
+ * - EntityAdapters: Transform transaction data to entity objects (Factory pattern)
+ * - TransactionUpdater: Updates transactions with entity references
+ */
+
 import mongoose from 'mongoose';
+import { findAllWithCompanyCnpj as findAllTransactionsWithCompany } from '../../../repository/transactionRepository.js';
+import { DocumentValidator } from './documentValidator.js';
+import { CompanyProcessor } from './companyProcessor.js';
+import { PersonProcessor } from './personProcessor.js';
+import { AnonymousPersonProcessor } from './anonymousPersonProcessor.js';
+import { DOCUMENT_TYPES } from './types.js';
 import {
-  findAllWithCompanyCnpj as findAllTransactionsWithCompany,
-  updateById as updateTransaction,
-} from '../../../repository/transactionRepository.js';
-import {
-  findByCnpj,
-  insert as insertCompany,
-} from '../../../repository/companyRepository.js';
-import {
-  findByCpf,
-  insert as insertPerson,
-} from '../../../repository/personRepository.js';
-import {
-  identifyDocumentType,
-  formatCPF,
-} from '../../../infrasctructure/validators/index.js';
+  createDryRunStats,
+  displayDryRunStatistics,
+  generateDryRunReport,
+} from './dryRunUtils.js';
 
 /**
  * Migrates company and person data from transactions to their respective collections
  * Extracts unique companies (CNPJ) and persons (CPF) based on document identifiers
  * Prevents duplicates and enriches entity data over time
  * Uses MongoDB transactions to ensure data consistency
+ * @param {boolean} dryRun - Whether to run in dry-run mode (no actual changes)
+ * @returns {Object} Migration statistics or dry-run report
  */
-export const migrateCompanyDataToCompanyCollection = async () => {
+export async function migrateCompanyDataToCompanyCollection(dryRun = false) {
   const session = await mongoose.startSession();
 
   try {
-    console.log(
-      '🏢 Starting company and person data migration from transactions with CNPJ/CPF...'
-    );
+    if (dryRun) {
+      console.log(
+        '🧪 Starting DRY RUN analysis of company and person data migration from transactions with CNPJ/CPF...'
+      );
+    } else {
+      console.log(
+        '🏢 Starting company and person data migration from transactions with CNPJ/CPF...'
+      );
+    }
 
     const transactions = await findAllTransactionsWithCompany();
     console.log(
@@ -37,15 +54,50 @@ export const migrateCompanyDataToCompanyCollection = async () => {
 
     if (transactions.length === 0) {
       console.log('ℹ️ No transactions found. Migration completed.');
-      return { success: true, companiesCreated: 0, companiesUpdated: 0 };
+      const emptyResult = {
+        success: true,
+        transactionsAnalyzed: 0,
+        companiesCreated: 0,
+        companiesUpdated: 0,
+        personsCreated: 0,
+        personsUpdated: 0,
+        anonymousPersonsCreated: 0,
+        anonymousPersonsUpdated: 0,
+        uniqueEntitiesProcessed: 0,
+      };
+
+      if (dryRun) {
+        return { ...emptyResult, isDryRun: true };
+      }
+      return emptyResult;
     }
 
-    // Start MongoDB transaction
+    // Handle dry-run mode
+    if (dryRun) {
+      const dryRunStats = createDryRunStats();
+      dryRunStats.transactionsAnalyzed = transactions.length;
+
+      const migrationResult = await processTransactionsWithSession(
+        transactions,
+        session,
+        dryRun,
+        dryRunStats
+      );
+
+      // Display comprehensive dry-run statistics
+      displayDryRunStatistics(dryRunStats);
+
+      // Return detailed report
+      return generateDryRunReport(dryRunStats);
+    }
+
+    // Regular migration mode with MongoDB transaction
     let migrationResult;
     await session.withTransaction(async () => {
       migrationResult = await processTransactionsWithSession(
         transactions,
-        session
+        session,
+        dryRun
       );
     });
 
@@ -59,35 +111,57 @@ export const migrateCompanyDataToCompanyCollection = async () => {
   } finally {
     await session.endSession();
   }
-};
+}
 
 /**
- * Processes all transactions to extract and create companies with MongoDB session
+ * Processes all transactions to extract and create companies/persons with MongoDB session
  * @param {Array} transactions - Array of transactions to process
  * @param {Object} session - MongoDB session for transaction
+ * @param {boolean} dryRun - Whether this is a dry-run execution
+ * @param {Object} dryRunStats - Statistics collector for dry-run mode
  * @returns {Object} Migration summary with counts and statistics
  */
-async function processTransactionsWithSession(transactions, session) {
+async function processTransactionsWithSession(
+  transactions,
+  session,
+  dryRun = false,
+  dryRunStats = null
+) {
   const processedEntities = new Map();
   const stats = {
     success: true,
     transactionsAnalyzed: transactions.length,
     companiesCreated: 0,
     companiesUpdated: 0,
-    companiesSkipped: 0,
-    uniqueCompaniesProcessed: 0,
+    personsCreated: 0,
+    personsUpdated: 0,
+    anonymousPersonsCreated: 0,
+    anonymousPersonsUpdated: 0,
+    uniqueEntitiesProcessed: 0,
   };
 
+  // Initialize document validator (uses static methods)
   for (const transaction of transactions) {
     try {
       const result = await processTransactionWithSession(
         transaction,
         processedEntities,
-        session
+        session,
+        dryRun,
+        dryRunStats
       );
-      stats.companiesCreated += result.created;
-      stats.companiesSkipped += result.skipped;
-      stats.companiesUpdated += result.updated;
+
+      // Update statistics based on result type
+      if (result.entityType === DOCUMENT_TYPES.CNPJ) {
+        stats.companiesCreated += result.created;
+        stats.companiesUpdated += result.updated;
+      } else if (result.entityType === DOCUMENT_TYPES.CPF) {
+        stats.personsCreated += result.created;
+        stats.personsUpdated += result.updated;
+      } else if (result.entityType === DOCUMENT_TYPES.ANONYMOUS_CPF) {
+        stats.anonymousPersonsCreated += result.created;
+        stats.anonymousPersonsUpdated += result.updated;
+      }
     } catch (error) {
       console.error(
         `❌ Error processing transaction ${transaction.id}:`,
@@ -97,7 +171,13 @@ async function processTransactionsWithSession(transactions, session) {
     }
   }
 
-  stats.uniqueCompaniesProcessed = processedEntities.size;
+  stats.uniqueEntitiesProcessed = processedEntities.size;
+
+  // Update dry-run stats if provided
+  if (dryRun && dryRunStats) {
+    dryRunStats.uniqueEntitiesProcessed = processedEntities.size;
+  }
+
   return stats;
 }
 
@@ -106,320 +186,123 @@ async function processTransactionsWithSession(transactions, session) {
  * @param {Object} transaction - Transaction to process
  * @param {Map} processedEntities - Map of already processed entities (companies/persons)
  * @param {Object} session - MongoDB session for transaction
- * @returns {Object} Result with created/skipped/updated counts
+ * @param {boolean} dryRun - Whether this is a dry-run execution
+ * @param {Object} dryRunStats - Statistics collector for dry-run mode
+ * @returns {Object} Result with created/updated counts and entity type
  */
 async function processTransactionWithSession(
   transaction,
   processedEntities,
-  session
+  session,
+  dryRun = false,
+  dryRunStats = null
 ) {
   // Skip transactions without company data
   if (!hasCompanyData(transaction)) {
-    return { created: 0, skipped: 0, updated: 0 };
+    return { created: 0, updated: 0, entityType: null };
   }
 
   const entityIdentifier = getEntityIdentifier(transaction);
 
-  // Validate and identify document type (CNPJ/CPF)
-  const documentInfo = identifyDocumentType(entityIdentifier);
-
-  if (!documentInfo.isValid) {
-    // Check if it could be an anonymized CPF (common for privacy reasons)
-    if (isAnonymizedCPF(entityIdentifier)) {
-      console.log(`🔒 Processing anonymized CPF: ${entityIdentifier}`);
-
-      // Skip if already processed in this migration
-      if (processedEntities.has(entityIdentifier)) {
-        return { created: 0, skipped: 0, updated: 0 };
-      }
-
-      return await processAnonymousPersonTransaction(
-        transaction,
-        processedEntities,
-        session
-      );
-    }
-
-    console.log(`⚠️ Invalid document identifier: ${entityIdentifier}`);
-    return { created: 0, skipped: 0, updated: 0 };
-  }
-
   // Skip if already processed in this migration
   if (processedEntities.has(entityIdentifier)) {
-    return { created: 0, skipped: 0, updated: 0 };
+    return { created: 0, updated: 0, entityType: null };
   }
 
-  // Process based on document type
-  if (documentInfo.type === 'cnpj') {
-    return await processCompanyTransaction(
+  // Validate and identify document type using the validator
+  const documentInfo = DocumentValidator.validateDocument(entityIdentifier);
+
+  // Handle invalid documents (check for anonymized CPF first)
+  if (!documentInfo.isValid) {
+    return await handleInvalidDocument(
+      entityIdentifier,
       transaction,
       processedEntities,
-      session
+      session,
+      dryRun,
+      dryRunStats
     );
-  } else if (documentInfo.type === 'cpf') {
-    return await processPersonTransaction(
+  }
+
+  // Process valid documents based on type
+  return await processValidDocument(
+    documentInfo,
+    transaction,
+    processedEntities,
+    session,
+    dryRun,
+    dryRunStats
+  );
+}
+
+/**
+ * Handles invalid document identifiers (potentially anonymized CPF)
+ */
+async function handleInvalidDocument(
+  entityIdentifier,
+  transaction,
+  processedEntities,
+  session,
+  dryRun = false,
+  dryRunStats = null
+) {
+  // Check if it could be an anonymized CPF
+  if (DocumentValidator.isAnonymizedCPF(entityIdentifier)) {
+    console.log(`🔒 Processing anonymized CPF: ${entityIdentifier}`);
+    const result = await AnonymousPersonProcessor.process(
       transaction,
       processedEntities,
-      session
+      session,
+      dryRun,
+      dryRunStats
     );
+
+    return { ...result, entityType: DOCUMENT_TYPES.ANONYMOUS_CPF };
   }
 
-  return { created: 0, skipped: 0, updated: 0 };
+  console.log(`⚠️ Invalid document identifier: ${entityIdentifier}`);
+  console.log('📄 Transaction record with invalid identifier:');
+  console.log(JSON.stringify(transaction, null, 2)); // Formatted output
+  return { created: 0, updated: 0, entityType: null };
 }
 
 /**
- * Processes company transactions (CNPJ)
- * @param {Object} transaction - Transaction to process
- * @param {Map} processedEntities - Map of already processed entities
- * @param {Object} session - MongoDB session for transaction
- * @returns {Object} Result with created/skipped/updated counts
+ * Processes valid documents based on their type
  */
-async function processCompanyTransaction(
+async function processValidDocument(
+  documentInfo,
   transaction,
   processedEntities,
-  session
+  session,
+  dryRun = false,
+  dryRunStats = null
 ) {
-  const companyIdentifier = getEntityIdentifier(transaction);
+  let result;
+  let entityType;
 
-  const existingCompany = await findExistingCompanyWithSession(
-    transaction,
-    session
-  );
-
-  if (existingCompany) {
-    console.log(
-      `✅ Company already exists: ${
-        existingCompany.corporateName || existingCompany.tradeName
-      }`
-    );
-    // Update transaction with companyId if not already set
-    const updateResult = await updateTransactionWithCompanyIdSession(
+  if (documentInfo.type === DOCUMENT_TYPES.CNPJ) {
+    result = await CompanyProcessor.process(
       transaction,
-      existingCompany.id,
-      session
+      processedEntities,
+      session,
+      dryRun,
+      dryRunStats
     );
-    processedEntities.set(companyIdentifier, true);
-    return { created: 0, skipped: 1, updated: updateResult ? 1 : 0 };
-  }
-
-  // Create new company
-  const newCompanyData = createCompanyFromTransaction(transaction);
-  if (newCompanyData) {
-    const createdCompany = await insertCompanyWithSession(
-      newCompanyData,
-      session
-    );
-    console.log(
-      `🆕 Created company: ${
-        newCompanyData.corporateName || newCompanyData.tradeName
-      }`
-    );
-    // Update transaction with the new companyId
-    const updateResult = await updateTransactionWithCompanyIdSession(
+    entityType = DOCUMENT_TYPES.CNPJ;
+  } else if (documentInfo.type === DOCUMENT_TYPES.CPF) {
+    result = await PersonProcessor.process(
       transaction,
-      createdCompany.id,
-      session
+      processedEntities,
+      session,
+      dryRun,
+      dryRunStats
     );
-    processedEntities.set(companyIdentifier, true);
-    return { created: 1, skipped: 0, updated: updateResult ? 1 : 0 };
+    entityType = DOCUMENT_TYPES.CPF;
+  } else {
+    return { created: 0, updated: 0, entityType: null };
   }
 
-  return { created: 0, skipped: 0, updated: 0 };
-}
-
-/**
- * Processes person transactions (CPF)
- * @param {Object} transaction - Transaction to process
- * @param {Map} processedEntities - Map of already processed entities
- * @param {Object} session - MongoDB session for transaction
- * @returns {Object} Result with created/skipped/updated counts
- */
-async function processPersonTransaction(
-  transaction,
-  processedEntities,
-  session
-) {
-  const personIdentifier = getEntityIdentifier(transaction);
-
-  const existingPerson = await findExistingPersonWithSession(
-    transaction,
-    session
-  );
-
-  if (existingPerson) {
-    console.log(`✅ Person already exists: ${existingPerson.fullName}`);
-    // Update transaction with personId if not already set
-    const updateResult = await updateTransactionWithPersonIdSession(
-      transaction,
-      existingPerson.id,
-      session
-    );
-    processedEntities.set(personIdentifier, true);
-    return { created: 0, skipped: 1, updated: updateResult ? 1 : 0 };
-  }
-
-  // Create new person
-  const newPersonData = createPersonFromTransaction(transaction);
-  if (newPersonData) {
-    const createdPerson = await insertPersonWithSession(newPersonData, session);
-    console.log(`🆕 Created person: ${newPersonData.fullName}`);
-    // Update transaction with the new personId
-    const updateResult = await updateTransactionWithPersonIdSession(
-      transaction,
-      createdPerson.id,
-      session
-    );
-    processedEntities.set(personIdentifier, true);
-    return { created: 1, skipped: 0, updated: updateResult ? 1 : 0 };
-  }
-
-  return { created: 0, skipped: 0, updated: 0 };
-}
-
-/**
- * Processes anonymous person transactions (anonymized CPF)
- * @param {Object} transaction - Transaction to process
- * @param {Map} processedEntities - Map of already processed entities
- * @param {Object} session - MongoDB session for transaction
- * @returns {Object} Result with created/skipped/updated counts
- */
-async function processAnonymousPersonTransaction(
-  transaction,
-  processedEntities,
-  session
-) {
-  const personIdentifier = getEntityIdentifier(transaction);
-
-  // Check if anonymous person already exists
-  const existingPerson = await findExistingAnonymousPersonWithSession(
-    transaction,
-    session
-  );
-
-  if (existingPerson) {
-    console.log(
-      `✅ Anonymous person already exists: ${existingPerson.fullName}`
-    );
-    // Update transaction with personId if not already set
-    const updateResult = await updateTransactionWithPersonIdSession(
-      transaction,
-      existingPerson.id,
-      session
-    );
-    processedEntities.set(personIdentifier, true);
-    return { created: 0, skipped: 1, updated: updateResult ? 1 : 0 };
-  }
-
-  // Create new anonymous person
-  const newPersonData = createAnonymousPersonFromTransaction(transaction);
-  if (newPersonData) {
-    const createdPerson = await insertPersonWithSession(newPersonData, session);
-    console.log(`🆕 Created anonymous person: ${newPersonData.fullName}`);
-    // Update transaction with the new personId
-    const updateResult = await updateTransactionWithPersonIdSession(
-      transaction,
-      createdPerson.id,
-      session
-    );
-    processedEntities.set(personIdentifier, true);
-    return { created: 1, skipped: 0, updated: updateResult ? 1 : 0 };
-  }
-
-  return { created: 0, skipped: 0, updated: 0 };
-}
-
-/**
- * Checks if a document identifier could be an anonymized CPF
- * Common patterns: ***.123.456-**, 123.***.*89-**, etc.
- * @param {string} identifier - Document identifier to check
- * @returns {boolean} True if it looks like an anonymized CPF
- */
-function isAnonymizedCPF(identifier) {
-  if (!identifier || typeof identifier !== 'string') {
-    return false;
-  }
-
-  const cleanIdentifier = identifier.replace(/\D/g, '');
-
-  // Check if it has CPF-like length (11 digits) but contains anonymization patterns
-  const originalIdentifier = identifier.trim();
-
-  // Common anonymization patterns
-  const anonymizationPatterns = [
-    /\*{3,}/, // Three or more asterisks
-    /x{3,}/i, // Three or more x's (case insensitive)
-    /##+/, // Hash symbols
-    /\.{3,}/, // Multiple dots beyond normal CPF formatting
-    /\d{1,3}[\*x#\.]{3,}\d{1,3}/i, // Digits-anonymization-digits pattern
-  ];
-
-  // Check if it matches anonymization patterns and has reasonable length
-  const hasAnonymizationPattern = anonymizationPatterns.some((pattern) =>
-    pattern.test(originalIdentifier)
-  );
-
-  // Should have some structure suggesting it's a CPF (between 8-15 chars when including formatting)
-  const hasReasonableLength =
-    originalIdentifier.length >= 8 && originalIdentifier.length <= 15;
-
-  // Should contain some digits
-  const hasDigits = /\d/.test(originalIdentifier);
-
-  return hasAnonymizationPattern && hasReasonableLength && hasDigits;
-}
-
-/**
- * Finds existing anonymous person by anonymized identifier
- * @param {Object} transaction - Transaction with anonymized CPF data
- * @param {Object} session - MongoDB session
- * @returns {Object|null} Existing anonymous person or null
- */
-async function findExistingAnonymousPersonWithSession(transaction, session) {
-  if (transaction.companyCnpj) {
-    // For anonymous persons, we search by the anonymized CPF directly
-    return await findByCpf(transaction.companyCnpj, session);
-  }
-  return null;
-}
-
-/**
- * Creates anonymous person data from transaction with anonymized CPF
- * @param {Object} transaction - Transaction containing anonymized person data
- * @returns {Object|null} Anonymous person data object or null
- */
-function createAnonymousPersonFromTransaction(transaction) {
-  if (!transaction.companyCnpj) {
-    return null;
-  }
-
-  const personData = {
-    fullName:
-      transaction.companyName ||
-      transaction.companySellerName ||
-      'Pessoa Anônima',
-    cpf: transaction.companyCnpj, // Keep the anonymized CPF as-is
-    status: 'anonymous', // Special status for anonymized persons
-    notes: 'Pessoa criada a partir de CPF anonimizado em transação',
-    sourceTransaction: transaction._id,
-
-    // Mark as having limited data due to anonymization
-    personalBusiness: {
-      hasPersonalBusiness: false, // Cannot determine business info from anonymized data
-    },
-
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
-
-  // Add seller name as additional info if different from company name
-  if (
-    transaction.companySellerName &&
-    transaction.companySellerName !== transaction.companyName
-  ) {
-    personData.notes += `. Vendedor: ${transaction.companySellerName}`;
-  }
-
-  return personData;
+  return { ...result, entityType };
 }
 
 /**
@@ -439,276 +322,3 @@ function hasCompanyData(transaction) {
 function getEntityIdentifier(transaction) {
   return transaction.companyCnpj;
 }
-
-/**
- * Finds existing company in database by CNPJ with session
- * @param {Object} transaction - Transaction with company CNPJ data
- * @param {Object} session - MongoDB session
- * @returns {Object|null} Existing company or null
- */
-async function findExistingCompanyWithSession(transaction, session) {
-  if (transaction.companyCnpj) {
-    return await findByCnpj(transaction.companyCnpj, session);
-  }
-  return null;
-}
-
-/**
- * Finds existing person in database by CPF with session
- * @param {Object} transaction - Transaction with person CPF data
- * @param {Object} session - MongoDB session
- * @returns {Object|null} Existing person or null
- */
-async function findExistingPersonWithSession(transaction, session) {
-  if (transaction.companyCnpj) {
-    return await findByCpf(transaction.companyCnpj, session);
-  }
-  return null;
-}
-
-/**
- * Inserts a company with session support
- * @param {Object} companyData - Company data to insert
- * @param {Object} session - MongoDB session
- * @returns {Object} Created company
- */
-async function insertCompanyWithSession(companyData, session) {
-  return await insertCompany(companyData, session);
-}
-
-/**
- * Inserts a person with session support
- * @param {Object} personData - Person data to insert
- * @param {Object} session - MongoDB session
- * @returns {Object} Created person
- */
-async function insertPersonWithSession(personData, session) {
-  return await insertPerson(personData, session);
-}
-
-/**
- * Updates transaction with companyId using session and removes redundant company fields
- * @param {Object} transaction - Transaction to update
- * @param {string} companyId - Company ID to link
- * @param {Object} session - MongoDB session
- * @returns {boolean} True if updated, false if skipped
- */
-async function updateTransactionWithCompanyIdSession(
-  transaction,
-  companyId,
-  session
-) {
-  try {
-    // Only update if companyId is not already set
-    if (!transaction.companyId) {
-      const updateData = {
-        companyId,
-        // Remove redundant company fields now that we have a reference
-        $unset: {
-          companyName: '',
-          companySellerName: '',
-          companyCnpj: '',
-        },
-      };
-
-      await updateTransaction(transaction.id, updateData, session);
-      console.log(
-        `🔗 Updated transaction ${transaction.id} with companyId: ${companyId} and removed redundant company fields`
-      );
-      return true;
-    }
-    return false;
-  } catch (error) {
-    console.error(
-      `❌ Error updating transaction ${transaction.id} with companyId:`,
-      error.message
-    );
-    throw error; // Rethrow to trigger transaction rollback
-  }
-}
-
-/**
- * Updates transaction with personId using session and removes redundant company fields
- * @param {Object} transaction - Transaction to update
- * @param {string} personId - Person ID to link
- * @param {Object} session - MongoDB session
- * @returns {boolean} True if updated, false if skipped
- */
-async function updateTransactionWithPersonIdSession(
-  transaction,
-  personId,
-  session
-) {
-  try {
-    // Only update if personId is not already set (using companyId field for now)
-    if (!transaction.companyId) {
-      const updateData = {
-        companyId: personId, // Using same field for simplicity
-        // Remove redundant company fields now that we have a reference
-        $unset: {
-          companyName: '',
-          companySellerName: '',
-          companyCnpj: '',
-        },
-      };
-
-      await updateTransaction(transaction.id, updateData, session);
-      console.log(
-        `🔗 Updated transaction ${transaction.id} with personId: ${personId} and removed redundant company fields`
-      );
-      return true;
-    }
-    return false;
-  } catch (error) {
-    console.error(
-      `❌ Error updating transaction ${transaction.id} with personId:`,
-      error.message
-    );
-    return false;
-  }
-}
-
-/**
- * Creates a company object from transaction data with CNPJ
- * @param {Object} transaction - Transaction containing company CNPJ information
- * @returns {Object|null} Company data object or null if insufficient data
- */
-function createCompanyFromTransaction(transaction) {
-  // Require CNPJ since we're filtering for it
-  if (!transaction.companyCnpj || transaction.companyCnpj.trim() === '') {
-    return null;
-  }
-
-  const companyData = {
-    // Core identification (razaoSocial / nomeFantasia)
-    companyName: transaction.companyName || '', // From TransactionModel
-    corporateName: transaction.companyName || '', // razaoSocial
-    tradeName: transaction.companyName || '', // nomeFantasia
-    companySellerName: transaction.companySellerName || '', // From TransactionModel
-
-    // Tax identification (documento)
-    companyCnpj: transaction.companyCnpj || '', // Keep for compatibility
-
-    // Registration info (informacoes de registro)
-    registrationInfo: {
-      registrationNumber: '', // numeroRegistro
-      registrationDate: null, // dataRegistro
-      registrationStatus: 'active', // statusRegistro - assume active
-      legalNature: '', // naturezaJuridica
-      companySize: '', // porteEmpresa
-      shareCapital: '', // capitalSocial
-    },
-
-    // Contact information (informacoes de contato)
-    contacts: {
-      mainEmail: '', // emailPrincipal
-      secondaryEmail: '', // emailSecundario
-      mainPhone: '', // telefonePrincipal
-      secondaryPhone: '', // telefoneSecundario
-      website: '', // website
-      socialMedia: {
-        facebook: '', // redesSociais.facebook
-        instagram: '', // redesSociais.instagram
-        linkedin: '', // redesSociais.linkedin
-        twitter: '', // redesSociais.twitter
-      },
-    },
-
-    // Address (endereco)
-    address: {
-      street: '', // endereco.rua
-      number: '', // endereco.numero
-      complement: '', // endereco.complemento
-      neighborhood: '', // endereco.bairro
-      city: '', // endereco.cidade
-      state: '', // endereco.estado
-      zipCode: '', // endereco.cep
-      country: 'Brasil', // endereco.pais - default to Brazil
-    },
-
-    // Business activities (atividades)
-    activities: {
-      primaryActivity: '', // atividadePrincipal
-      secondaryActivities: [], // atividadesSecundarias
-      cnaeCode: '', // codigoCnae
-      cnaeDescription: '', // descricaoCnae
-    },
-
-    // Corporate structure (estrutura societaria)
-    corporateStructure: {
-      partners: [], // socios
-      administrators: transaction.companySellerName
-        ? [
-            {
-              name: transaction.companySellerName, // nome
-              document: '', // documento
-              role: 'Seller', // cargo
-              participationPercentage: '', // percentualParticipacao
-            },
-          ]
-        : [], // administradores
-      legalRepresentatives: [], // representantesLegais
-    },
-
-    // Financial information (informacoes financeiras)
-    financialInfo: {
-      annualRevenue: '', // faturamentoAnual
-      employeeCount: '', // numeroFuncionarios
-      creditRating: '', // rating
-      taxRegime: '', // regimeTributario
-    },
-
-    // Additional information (informacoes adicionais)
-    additionalInfo: {
-      description: '', // descricao
-      observations: `Migrated from transaction data. Original seller: ${
-        transaction.companySellerName || 'N/A'
-      }`, // observacoes
-      tags: ['migrated-from-transaction'], // tags
-      isActive: true, // ativo
-      verificationStatus: 'pending', // statusVerificacao
-    },
-
-    // Metadata
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    dataSource: 'transaction-migration', // fonte de dados
-  };
-
-  return companyData;
-}
-
-/**
- * Creates person data from transaction
- * @param {Object} transaction - Transaction containing person data
- * @returns {Object|null} Person data object or null
- */
-function createPersonFromTransaction(transaction) {
-  if (!transaction.companyCnpj) {
-    return null;
-  }
-
-  const personData = {
-    fullName:
-      transaction.companyName ||
-      transaction.companySellerName ||
-      'Nome não informado',
-    cpf: formatCPF(transaction.companyCnpj),
-    status: 'active',
-    sourceTransaction: transaction._id,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
-
-  // Add seller name as additional info if different from company name
-  if (
-    transaction.companySellerName &&
-    transaction.companySellerName !== transaction.companyName
-  ) {
-    personData.notes = `Nome do vendedor: ${transaction.companySellerName}`;
-  }
-
-  return personData;
-}
-
-export default migrateCompanyDataToCompanyCollection;
