@@ -27,99 +27,75 @@ export class CompanyAdapter {
     }
 
     return {
-      // Core identification
+      // Basic company information
       companyName: transaction.companyName || '',
-      corporateName: transaction.companyName || '',
-      tradeName: transaction.companyName || '',
-      companySellerName: transaction.companySellerName || '',
-
-      // Tax identification
       companyCnpj: transaction.companyCnpj || '',
 
-      // Registration info
-      registrationInfo: {
-        registrationNumber: '',
-        registrationDate: null,
-        registrationStatus: ENTITY_STATUS.ACTIVE,
-        legalNature: '',
-        companySize: '',
-        shareCapital: '',
-      },
+      // Registration information
+      corporateName: transaction.companyName || '',
+      tradeName: transaction.companyName || '',
+      foundationDate: null,
+      companySize: '',
+      legalNature: '',
+      microEntrepreneurOption: false,
+      simplifiedTaxOption: false,
+      shareCapital: '',
+      companyType: 'Matriz',
+      status: 'Ativa', // Using enum value from CompanyModel: 'Ativa', 'Inativa', 'Suspensa', 'Baixada'
+      statusDate: null,
 
       // Contact information
       contacts: {
-        mainEmail: '',
-        secondaryEmail: '',
-        mainPhone: '',
-        secondaryPhone: '',
+        email: '',
+        phones: [],
         website: '',
-        socialMedia: {
-          facebook: '',
-          instagram: '',
-          linkedin: '',
-          twitter: '',
-        },
+        socialMedia: [],
       },
 
-      // Address
+      // Address information
       address: {
         street: '',
         number: '',
         complement: '',
         neighborhood: '',
+        zipCode: '',
         city: '',
         state: '',
-        zipCode: '',
         country: 'Brasil',
       },
 
       // Business activities
       activities: {
-        primaryActivity: '',
-        secondaryActivities: [],
-        cnaeCode: '',
-        cnaeDescription: '',
+        primary: {
+          code: '',
+          description: '',
+        },
+        secondary: [],
       },
 
-      // Corporate structure
-      corporateStructure: {
-        partners: [],
-        administrators: transaction.companySellerName
-          ? [
-              {
-                name: transaction.companySellerName,
-                document: '',
-                role: 'Seller',
-                participationPercentage: '',
-              },
-            ]
-          : [],
-        legalRepresentatives: [],
-      },
+      // Corporate structure - following the exact schema
+      corporateStructure: transaction.companySellerName
+        ? [
+            {
+              name: transaction.companySellerName || '',
+              type: 'Vendedor', // Using the enum value from CompanyModel
+              cnpj: '',
+              country: 'Brasil',
+            },
+          ]
+        : [],
 
-      // Financial information
-      financialInfo: {
-        annualRevenue: '',
-        employeeCount: '',
-        creditRating: '',
-        taxRegime: '',
-      },
-
-      // Additional information
-      additionalInfo: {
-        description: '',
-        observations: `Migrated from transaction data. Original seller: ${
-          transaction.companySellerName || 'N/A'
-        }`,
-        tags: ['migrated-from-transaction'],
-        isActive: true,
-        verificationStatus: 'pending',
+      // Transaction statistics
+      statistics: {
+        totalTransactions: 0,
+        totalTransactionValue: '0',
+        lastTransaction: null,
       },
 
       // Metadata
       createdAt: new Date(),
       updatedAt: new Date(),
-      dataSource: 'transaction-migration',
+      sourceTransaction: transaction._id,
     };
   }
 }

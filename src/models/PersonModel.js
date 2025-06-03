@@ -264,7 +264,7 @@ const PersonSchema = new mongoose.Schema(
     // Metadados (Metadata)
     status: {
       type: String,
-      enum: ['active', 'inactive', 'blocked'],
+      enum: ['active', 'inactive', 'blocked', 'anonymous'],
       default: 'active',
       comment: 'status - Status da pessoa no sistema',
     },
