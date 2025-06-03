@@ -60,7 +60,7 @@ const initialize = async () => {
   // Initiate the connection
   await connectDB();
   await initializeDatabase();
-  await identifyAndUpdateCompanyFields();
+  // await identifyAndUpdateCompanyFields();
   await migrateCompanyDataToCompanyCollection(true);
 };
 

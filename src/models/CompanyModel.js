@@ -15,10 +15,6 @@ const companySchema = mongoose.Schema({
     index: true,
     trim: true,
   },
-  companySellerName: {
-    type: String,
-    trim: true,
-  },
 
   // Registration information (from CompanyModel.md)
   corporateName: {
@@ -93,6 +89,42 @@ const companySchema = mongoose.Schema({
         trim: true,
       },
     ],
+    website: {
+      type: String,
+      trim: true,
+      lowercase: true,
+    },
+    socialMedia: [
+      {
+        platform: {
+          type: String,
+          enum: [
+            'Facebook',
+            'Instagram',
+            'Twitter',
+            'LinkedIn',
+            'YouTube',
+            'TikTok',
+            'Pinterest',
+            'Other',
+          ],
+          required: true,
+          trim: true,
+        },
+        handle: {
+          type: String,
+          trim: true,
+        },
+        url: {
+          type: String,
+          trim: true,
+        },
+        isActive: {
+          type: Boolean,
+          default: true,
+        },
+      },
+    ],
   },
 
   // Address information
@@ -100,6 +132,11 @@ const companySchema = mongoose.Schema({
     // endereco
     street: {
       // logradouro
+      type: String,
+      trim: true,
+    },
+    number: {
+      // numero
       type: String,
       trim: true,
     },
@@ -129,6 +166,12 @@ const companySchema = mongoose.Schema({
       type: String,
       trim: true,
       index: true,
+    },
+    country: {
+      // pais
+      type: String,
+      trim: true,
+      default: 'Brasil',
     },
   },
 
@@ -177,7 +220,7 @@ const companySchema = mongoose.Schema({
       type: {
         // tipo
         type: String,
-        enum: ['Administrador', 'Sócio', 'Procurador'], // Administrator, Partner, Attorney
+        enum: ['Administrador', 'Sócio', 'Procurador', 'Vendedor'], // Administrator, Partner, Attorney
         trim: true,
       },
       cnpj: {
@@ -219,6 +262,13 @@ const companySchema = mongoose.Schema({
       // ultimaTransacao
       type: Date,
     },
+  },
+
+  // Rastreamento de origem (Source tracking)
+  sourceTransaction: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Transaction',
+    comment: 'transacaoOrigem - Transação que originou este registro',
   },
 });
 
