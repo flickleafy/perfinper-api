@@ -119,6 +119,12 @@ export async function deleteByIds(ids) {
 
 export async function updateById(id, transactionObject, session = null) {
   try {
+    // Validate ID format before attempting update
+    if (!id) {
+      console.error('Error in updateById: Missing transaction ID');
+      throw new Error('Transaction ID is required for update');
+    }
+
     let updatedTransaction;
     if (session) {
       updatedTransaction = await TransactionModel.findByIdAndUpdate(
@@ -133,13 +139,18 @@ export async function updateById(id, transactionObject, session = null) {
         { new: true }
       );
     }
+
     if (!updatedTransaction) {
+      console.warn(`Transaction with ID ${id} not found for update`);
       return null;
     }
+
     return updatedTransaction;
   } catch (error) {
-    console.error('Error in updateById:', error.message);
-    throw new Error('An error occurred while updating the transaction by ID.');
+    console.error(`Error in updateById for ID ${id}:`, error.message);
+    throw new Error(
+      `An error occurred while updating transaction ${id}: ${error.message}`
+    );
   }
 }
 
