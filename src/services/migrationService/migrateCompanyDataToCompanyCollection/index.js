@@ -127,7 +127,10 @@ async function processTransactionsWithSession(
   dryRun = false,
   dryRunStats = null
 ) {
+  // This map tracks which entities have been created/found so we don't create duplicates
+  // But we'll still process all transactions to update them with entity references
   const processedEntities = new Map();
+
   const stats = {
     success: true,
     transactionsAnalyzed: transactions.length,
@@ -140,7 +143,7 @@ async function processTransactionsWithSession(
     uniqueEntitiesProcessed: 0,
   };
 
-  // Initialize document validator (uses static methods)
+  // Process all transactions, even those with the same CNPJ/CPF
   for (const transaction of transactions) {
     try {
       const result = await processTransactionWithSession(
@@ -164,7 +167,7 @@ async function processTransactionsWithSession(
       }
     } catch (error) {
       console.error(
-        `❌ Error processing transaction ${transaction.id}:`,
+        `❌ Error processing transaction ${transaction._id || transaction.id}:`,
         error.message
       );
       throw error; // Rethrow to trigger transaction rollback
@@ -197,17 +200,17 @@ async function processTransactionWithSession(
   dryRun = false,
   dryRunStats = null
 ) {
+  // Ensure transaction has id property for consistency (MongoDB uses _id)
+  if (transaction._id && !transaction.id) {
+    transaction.id = transaction._id.toString();
+  }
+
   // Skip transactions without company data
   if (!hasCompanyData(transaction)) {
     return { created: 0, updated: 0, entityType: null };
   }
 
   const entityIdentifier = getEntityIdentifier(transaction);
-
-  // Skip if already processed in this migration
-  if (processedEntities.has(entityIdentifier)) {
-    return { created: 0, updated: 0, entityType: null };
-  }
 
   // Validate and identify document type using the validator
   const documentInfo = DocumentValidator.validateDocument(entityIdentifier);

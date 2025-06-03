@@ -43,7 +43,10 @@ export class CompanyProcessor {
 
     try {
       // Check if company already exists
-      const existingCompany = await this.findExisting(transaction, session);
+      const existingCompany = await findByCnpj(
+        transaction.companyCnpj,
+        session
+      );
 
       if (existingCompany) {
         console.log(
@@ -106,7 +109,7 @@ export class CompanyProcessor {
       }
 
       // Regular mode: actually create the company
-      const createdCompany = await this.create(newCompanyData, session);
+      const createdCompany = await insertCompany(newCompanyData, session);
 
       if (!createdCompany) {
         console.warn(
@@ -140,28 +143,5 @@ export class CompanyProcessor {
       }
       throw error;
     }
-  }
-
-  /**
-   * Finds existing company in database by CNPJ
-   * @param {Object} transaction - Transaction with company CNPJ data
-   * @param {Object} session - MongoDB session
-   * @returns {Object|null} Existing company or null
-   */
-  static async findExisting(transaction, session) {
-    if (transaction.companyCnpj) {
-      return await findByCnpj(transaction.companyCnpj, session);
-    }
-    return null;
-  }
-
-  /**
-   * Creates a new company with session support
-   * @param {Object} companyData - Company data to insert
-   * @param {Object} session - MongoDB session
-   * @returns {Object} Created company
-   */
-  static async create(companyData, session) {
-    return await insertCompany(companyData, session);
   }
 }

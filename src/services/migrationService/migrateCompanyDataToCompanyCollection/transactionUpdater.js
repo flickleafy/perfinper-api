@@ -5,6 +5,7 @@
  */
 
 import { updateById as updateTransaction } from '../../../repository/transactionRepository.js';
+import mongoose from 'mongoose';
 
 /**
  * Transaction Updater class
@@ -20,8 +21,17 @@ export class TransactionUpdater {
    */
   static async updateWithCompanyId(transaction, companyId, session) {
     try {
-      // Only update if companyId is not already set
-      if (!transaction.companyId) {
+      // Ensure transaction has id property for consistency (MongoDB uses _id)
+      const transactionId =
+        transaction.id || (transaction._id ? transaction._id.toString() : null);
+
+      if (!transactionId) {
+        console.log(`⚠️ Cannot update transaction - missing ID`);
+        return false;
+      }
+
+      // Check if provided companyId is valid MongoDB ObjectId
+      if (companyId && mongoose.Types.ObjectId.isValid(companyId)) {
         const updateData = {
           companyId,
           // Remove redundant company fields now that we have a reference
@@ -32,12 +42,15 @@ export class TransactionUpdater {
           },
         };
 
-        await updateTransaction(transaction.id, updateData, session);
+        await updateTransaction(transactionId, updateData, session);
         console.log(
-          `🔗 Updated transaction ${transaction.id} with companyId: ${companyId} and removed redundant company fields`
+          `🔗 Updated transaction ${transactionId} with companyId: ${companyId} and removed redundant company fields`
         );
         return true;
       }
+      console.log(
+        `⚠️ Skipped updating transaction ${transactionId} - invalid companyId provided: ${companyId}`
+      );
       return false;
     } catch (error) {
       console.error(
@@ -57,8 +70,17 @@ export class TransactionUpdater {
    */
   static async updateWithPersonId(transaction, personId, session) {
     try {
-      // Only update if personId is not already set (using companyId field for now)
-      if (!transaction.companyId) {
+      // Ensure transaction has id property for consistency (MongoDB uses _id)
+      const transactionId =
+        transaction.id || (transaction._id ? transaction._id.toString() : null);
+
+      if (!transactionId) {
+        console.log(`⚠️ Cannot update transaction - missing ID`);
+        return false;
+      }
+
+      // Check if provided personId is valid MongoDB ObjectId
+      if (personId && mongoose.Types.ObjectId.isValid(personId)) {
         const updateData = {
           companyId: personId, // Using same field for simplicity
           // Remove redundant company fields now that we have a reference
@@ -69,12 +91,15 @@ export class TransactionUpdater {
           },
         };
 
-        await updateTransaction(transaction.id, updateData, session);
+        await updateTransaction(transactionId, updateData, session);
         console.log(
-          `🔗 Updated transaction ${transaction.id} with personId: ${personId} and removed redundant company fields`
+          `🔗 Updated transaction ${transactionId} with personId: ${personId} and removed redundant company fields`
         );
         return true;
       }
+      console.log(
+        `⚠️ Skipped updating transaction ${transactionId} - invalid personId provided: ${personId}`
+      );
       return false;
     } catch (error) {
       console.error(
