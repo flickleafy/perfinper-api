@@ -329,3 +329,90 @@ export async function findAllByDescription(description) {
     );
   }
 }
+
+/**
+ * Find transactions by fiscal book ID
+ * @param {string} fiscalBookId - Fiscal book ID to search for
+ * @param {Object} session - MongoDB session for transactions
+ * @returns {Promise<Array>} Array of transaction documents
+ */
+export async function findByFiscalBookId(fiscalBookId, session = null) {
+  try {
+    const query = TransactionModel.find({ fiscalBookId });
+
+    if (session) {
+      query.session(session);
+    }
+
+    return await query.exec();
+  } catch (error) {
+    console.error('Error in findByFiscalBookId:', error.message);
+    throw new Error(
+      'An error occurred while finding transactions by fiscal book ID.'
+    );
+  }
+}
+
+/**
+ * Update fiscal book ID for multiple transactions
+ * @param {Array<string>} transactionIds - Array of transaction IDs
+ * @param {string} fiscalBookId - Fiscal book ID to assign
+ * @param {Object} session - MongoDB session for transactions
+ * @returns {Promise<Object>} Update result
+ */
+export async function updateFiscalBookForTransactions(
+  transactionIds,
+  fiscalBookId,
+  session = null
+) {
+  try {
+    const updateOptions = { multi: true };
+    if (session) {
+      updateOptions.session = session;
+    }
+
+    const result = await TransactionModel.updateMany(
+      { _id: { $in: transactionIds } },
+      { $set: { fiscalBookId } },
+      updateOptions
+    );
+
+    return result;
+  } catch (error) {
+    console.error('Error in updateFiscalBookForTransactions:', error.message);
+    throw new Error(
+      'An error occurred while updating fiscal book ID for transactions.'
+    );
+  }
+}
+
+/**
+ * Remove fiscal book ID from transactions
+ * @param {string} fiscalBookId - Fiscal book ID to remove
+ * @param {Object} session - MongoDB session for transactions
+ * @returns {Promise<Object>} Update result
+ */
+export async function removeFiscalBookFromTransactions(
+  fiscalBookId,
+  session = null
+) {
+  try {
+    const updateOptions = { multi: true };
+    if (session) {
+      updateOptions.session = session;
+    }
+
+    const result = await TransactionModel.updateMany(
+      { fiscalBookId },
+      { $unset: { fiscalBookId: '' } },
+      updateOptions
+    );
+
+    return result;
+  } catch (error) {
+    console.error('Error in removeFiscalBookFromTransactions:', error.message);
+    throw new Error(
+      'An error occurred while removing fiscal book ID from transactions.'
+    );
+  }
+}
