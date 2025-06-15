@@ -56,6 +56,11 @@ const transactionSchema = mongoose.Schema({
     ref: 'company',
     index: true,
   }, // reference to Company collection
+  fiscalBookId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'fiscalBook',
+    index: true,
+  }, // reference to Fiscal Book collection
 });
 
 const transformTransactionFields = (doc, ret, options) => {

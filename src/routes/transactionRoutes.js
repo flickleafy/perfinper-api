@@ -9,6 +9,10 @@ import {
   removeAllTransactionsInPeriod,
   findUniquePeriods,
   findUniqueYears,
+  getTransactionsByFiscalBookId,
+  assignTransactionsToFiscalBook,
+  removeTransactionsFromFiscalBook,
+  updateTransactionFiscalBook,
 } from '../services/transactionService.js';
 
 const transactionRouter = express.Router();
@@ -29,5 +33,17 @@ transactionRouter.delete(
 );
 transactionRouter.post('/periods', findUniquePeriods);
 transactionRouter.post('/years', findUniqueYears);
+
+// Fiscal Book related routes
+transactionRouter.get(
+  '/fiscalBook/:fiscalBookId',
+  getTransactionsByFiscalBookId
+);
+transactionRouter.post('/fiscalBook/assign', assignTransactionsToFiscalBook);
+transactionRouter.delete(
+  '/fiscalBook/:fiscalBookId',
+  removeTransactionsFromFiscalBook
+);
+transactionRouter.put('/:id/fiscalBook', updateTransactionFiscalBook);
 
 export default transactionRouter;
