@@ -25,3 +25,11 @@ yarn-error.log*
 
 */services/import*
 */services/export*
+
+# Ignore all markdown files except README.md
+*.md
+!README.md
+.vscode
+
+logs
+docs

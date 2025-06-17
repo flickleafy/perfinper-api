@@ -11,10 +11,11 @@ import * as fiscalBookRepository from '../../repository/fiscalBookRepository.js'
 async function findTransactionsForPeriod(period, companyId) {
   let allTransactions;
 
+  console.log('period.length',String(period).length)
   // Check if period is a year or a specific month
-  if (period.length === 4) {
+  if (String(period).length === 4) {
     // It's a year - get all transactions for the year
-    allTransactions = await transactionRepository.findAllInYear(period);
+    allTransactions = await transactionRepository.findAllInYear(String(period));
   } else {
     // It's a specific period (YYYY-MM)
     allTransactions = await transactionRepository.findAllInPeriod(period);
@@ -44,9 +45,9 @@ async function findTransactionsForPeriod(period, companyId) {
 export async function migrateTransactionsToFiscalBooks(options = {}) {
   const {
     companyId,
-    period = 2024,
+    period = '2023',
     bookType = 'Outros',
-    dryRun = true,
+    dryRun = false,
   } = options;
 
   if (!period) {
@@ -75,7 +76,7 @@ export async function migrateTransactionsToFiscalBooks(options = {}) {
       bookName,
       bookType,
       bookPeriod: period,
-      status: 'Aberto',
+      status: 'Fechado',
       reference: `Auto-created on ${new Date().toISOString().split('T')[0]}`,
       fiscalData: {
         fiscalYear: parseInt(period.split('-')[0]),

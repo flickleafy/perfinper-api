@@ -446,7 +446,7 @@ function logResults(stats) {
  * @param {boolean} dryRun - If true, shows what would be changed without making actual updates
  * @returns {Promise<Object>} - Result statistics
  */
-export async function fixCompaniesEntities(dryRun = false) {
+export async function fixCompaniesEntities(dryRun = true) {
   let session = null;
 
   try {
@@ -504,18 +504,18 @@ export async function fixCompaniesEntities(dryRun = false) {
   }
 }
 
-// This allows the script to be run directly from the command line
-if (process.argv[1].endsWith('index.js')) {
-  const dryRun = process.argv.includes('--dry-run');
+// // This allows the script to be run directly from the command line
+// if (process.argv[1].endsWith('index.js')) {
+//   const dryRun = process.argv.includes('--dry-run');
 
-  fixCompaniesEntities(dryRun)
-    .then((stats) => {
-      console.log('Company fix operation completed with the following stats:');
-      console.log(JSON.stringify(stats, null, 2));
-      process.exit(0);
-    })
-    .catch((error) => {
-      console.error('Failed to fix company entities:', error);
-      process.exit(1);
-    });
-}
+//   fixCompaniesEntities(dryRun)
+//     .then((stats) => {
+//       console.log('Company fix operation completed with the following stats:');
+//       console.log(JSON.stringify(stats, null, 2));
+//       process.exit(0);
+//     })
+//     .catch((error) => {
+//       console.error('Failed to fix company entities:', error);
+//       process.exit(1);
+//     });
+// }
