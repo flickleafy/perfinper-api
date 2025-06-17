@@ -37,7 +37,6 @@ app.use('/api/person', personRoutes);
 app.use('/api/import', importRoutes);
 app.use('/api/export', exportRoutes);
 app.use('/api/fiscal-book', fiscalBookRoutes);
-app.use('/api/migrations', migrationRoutes);
 
 /**
  * Database Connection Setup
@@ -66,7 +65,7 @@ const initialize = async () => {
   await initializeDatabase();
   // await identifyAndUpdateCompanyFields();
   // await migrateCompanyDataToCompanyCollection(false);
-  await migrateTransactionsToFiscalBooks();
+  // await migrateTransactionsToFiscalBooks();
 };
 
 initialize();
