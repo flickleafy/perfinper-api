@@ -26,6 +26,8 @@ export function transactionPrototype(body) {
     companyName,
     companySellerName,
     companyCnpj,
+    companyId,
+    fiscalBookId,
   } = body;
 
   return {
@@ -51,5 +53,7 @@ export function transactionPrototype(body) {
     companyName,
     companySellerName,
     companyCnpj,
+    companyId,
+    fiscalBookId,
   };
 }
