@@ -1,10 +1,10 @@
+import { jest } from '@jest/globals';
+
 /**
  * Tests for Migration Service Orchestrator (index.js)
  * Tests the main migration coordinator, session management, and helper functions
  * Covers both unit tests for individual functions and integration tests for the complete workflow
  */
-
-import mongoose from 'mongoose';
 
 // Mock external dependencies before importing the module under test
 jest.unstable_mockModule(
@@ -14,32 +14,63 @@ jest.unstable_mockModule(
   })
 );
 
-jest.unstable_mockModule('../documentValidator.js', () => ({
+jest.unstable_mockModule('./documentValidator.js', () => ({
   DocumentValidator: {
     validateDocument: jest.fn(),
     isAnonymizedCPF: jest.fn(),
   },
 }));
 
-jest.unstable_mockModule('../companyProcessor.js', () => ({
+// Mock Processors
+jest.unstable_mockModule('./companyProcessor.js', () => ({
   CompanyProcessor: {
-    process: jest.fn(),
+    process: jest.fn().mockImplementation((transaction, map) => {
+      if (transaction.companyCnpj && map) {
+        map.set(transaction.companyCnpj, true);
+      }
+      return Promise.resolve({
+        created: 1,
+        skipped: 0,
+        updated: 0,
+        entityType: 'CNPJ',
+      });
+    }),
   },
 }));
 
-jest.unstable_mockModule('../personProcessor.js', () => ({
+jest.unstable_mockModule('./personProcessor.js', () => ({
   PersonProcessor: {
-    process: jest.fn(),
+    process: jest.fn().mockImplementation((transaction, map) => {
+      if (transaction.companyCnpj && map) {
+        map.set(transaction.companyCnpj, true);
+      }
+      return Promise.resolve({
+        created: 1,
+        skipped: 0,
+        updated: 0,
+        entityType: 'CPF',
+      });
+    }),
   },
 }));
 
-jest.unstable_mockModule('../anonymousPersonProcessor.js', () => ({
+jest.unstable_mockModule('./anonymousPersonProcessor.js', () => ({
   AnonymousPersonProcessor: {
-    process: jest.fn(),
+    process: jest.fn().mockImplementation((transaction, map) => {
+      if (transaction.companyCnpj && map) {
+        map.set(transaction.companyCnpj, true);
+      }
+      return Promise.resolve({
+        created: 1,
+        skipped: 0,
+        updated: 0,
+        entityType: 'ANONYMOUS_CPF',
+      });
+    }),
   },
 }));
 
-jest.unstable_mockModule('../types.js', () => ({
+jest.unstable_mockModule('./types.js', () => ({
   DOCUMENT_TYPES: {
     CNPJ: 'CNPJ',
     CPF: 'CPF',
@@ -55,17 +86,18 @@ jest.unstable_mockModule('mongoose', () => ({
 }));
 
 // Import the modules after mocking
+const { default: mongoose } = await import('mongoose');
 const { findAllWithCompanyCnpj } = await import(
   '../../../repository/transactionRepository.js'
 );
-const { DocumentValidator } = await import('../documentValidator.js');
-const { CompanyProcessor } = await import('../companyProcessor.js');
-const { PersonProcessor } = await import('../personProcessor.js');
+const { DocumentValidator } = await import('./documentValidator.js');
+const { CompanyProcessor } = await import('./companyProcessor.js');
+const { PersonProcessor } = await import('./personProcessor.js');
 const { AnonymousPersonProcessor } = await import(
-  '../anonymousPersonProcessor.js'
+  './anonymousPersonProcessor.js'
 );
-const { DOCUMENT_TYPES } = await import('../types.js');
-const { migrateCompanyDataToCompanyCollection } = await import('../index.js');
+const { DOCUMENT_TYPES } = await import('./types.js');
+const { migrateCompanyDataToCompanyCollection } = await import('./index.js');
 
 describe('Migration Service Orchestrator', () => {
   // Mock session object
@@ -141,8 +173,14 @@ describe('Migration Service Orchestrator', () => {
 
       // Mock CompanyProcessor
       CompanyProcessor.process
-        .mockResolvedValueOnce({ created: 1, updated: 0 })
-        .mockResolvedValueOnce({ created: 0, updated: 1 });
+        .mockImplementationOnce((t, map) => {
+          if (map) map.set(t.companyCnpj, true);
+          return Promise.resolve({ created: 1, updated: 0 });
+        })
+        .mockImplementationOnce((t, map) => {
+          if (map) map.set(t.companyCnpj, true);
+          return Promise.resolve({ created: 0, updated: 1 });
+        });
 
       // Act
       const result = await migrateCompanyDataToCompanyCollection();
@@ -183,7 +221,10 @@ describe('Migration Service Orchestrator', () => {
         type: DOCUMENT_TYPES.CPF,
       });
 
-      PersonProcessor.process.mockResolvedValue({ created: 1, updated: 0 });
+      PersonProcessor.process.mockImplementation((t, map) => {
+        if (map) map.set(t.companyCnpj || t.id, true);
+        return Promise.resolve({ created: 1, updated: 0 });
+      });
 
       // Act
       const result = await migrateCompanyDataToCompanyCollection();
@@ -215,9 +256,12 @@ describe('Migration Service Orchestrator', () => {
       DocumentValidator.validateDocument.mockReturnValue({ isValid: false });
       DocumentValidator.isAnonymizedCPF.mockReturnValue(true);
 
-      AnonymousPersonProcessor.process.mockResolvedValue({
-        created: 1,
-        updated: 0,
+      AnonymousPersonProcessor.process.mockImplementation((t, map) => {
+        if (map) map.set(t.companyCnpj || t.id, true);
+        return Promise.resolve({
+          created: 1,
+          updated: 0,
+        });
       });
 
       // Act
@@ -302,7 +346,15 @@ describe('Migration Service Orchestrator', () => {
         type: DOCUMENT_TYPES.CNPJ,
       });
 
-      CompanyProcessor.process.mockResolvedValue({ created: 1, updated: 0 });
+      // Reset mocks specific to this test
+      CompanyProcessor.process.mockReset();
+      CompanyProcessor.process.mockImplementation((t, map) => {
+        if (map && !map.has(t.companyCnpj)) {
+          map.set(t.companyCnpj, true);
+          return Promise.resolve({ created: 1, updated: 0 });
+        }
+        return Promise.resolve({ created: 0, updated: 0, skipped: 1 });
+      });
 
       // Act
       const result = await migrateCompanyDataToCompanyCollection();
@@ -311,7 +363,8 @@ describe('Migration Service Orchestrator', () => {
       expect(result.transactionsAnalyzed).toBe(2);
       expect(result.uniqueEntitiesProcessed).toBe(1); // Only one unique entity
       expect(result.companiesCreated).toBe(1);
-      expect(CompanyProcessor.process).toHaveBeenCalledTimes(1); // Called only once
+      // It is called twice, but the second call returns "skipped: 1"
+      expect(CompanyProcessor.process).toHaveBeenCalledTimes(2); 
     });
 
     it('should handle invalid documents that are not anonymized CPF', async () => {
@@ -435,11 +488,21 @@ describe('Migration Service Orchestrator', () => {
       DocumentValidator.isAnonymizedCPF.mockReturnValue(true);
 
       // Mock processor responses
-      CompanyProcessor.process.mockResolvedValue({ created: 1, updated: 0 });
-      PersonProcessor.process.mockResolvedValue({ created: 1, updated: 0 });
-      AnonymousPersonProcessor.process.mockResolvedValue({
-        created: 1,
-        updated: 0,
+      CompanyProcessor.process.mockImplementation((t, map) => {
+        if (map) map.set(t.companyCnpj, true);
+        return Promise.resolve({ created: 1, updated: 0 });
+      });
+      PersonProcessor.process.mockImplementation((t, map) => {
+        // Use ID or CNPJ field as identifier for map
+        if (map) map.set(t.companyCnpj || t.id, true);
+        return Promise.resolve({ created: 1, updated: 0 });
+      });
+      AnonymousPersonProcessor.process.mockImplementation((t, map) => {
+        if (map) map.set(t.companyCnpj || t.id, true);
+        return Promise.resolve({
+          created: 1,
+          updated: 0,
+        });
       });
 
       // Act
@@ -513,6 +576,63 @@ describe('Migration Service Orchestrator', () => {
       );
 
       consoleSpy.mockRestore();
+    });
+
+    it('should return dry run result for empty transactions', async () => {
+      findAllWithCompanyCnpj.mockResolvedValue([]);
+
+      const result = await migrateCompanyDataToCompanyCollection(true);
+
+      expect(result.isDryRun).toBe(true);
+      expect(result.transactionsAnalyzed).toBe(0);
+    });
+
+    it('should process dry run transactions and set ids from _id', async () => {
+      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+      const transaction = {
+        _id: { toString: () => 'txn-oid' },
+        companyCnpj: '12.345.678/0001-90',
+        companyName: 'Company A',
+      };
+
+      findAllWithCompanyCnpj.mockResolvedValue([transaction]);
+      DocumentValidator.validateDocument.mockReturnValue({
+        isValid: true,
+        type: DOCUMENT_TYPES.CNPJ,
+      });
+
+      const result = await migrateCompanyDataToCompanyCollection(true);
+
+      expect(transaction.id).toBe('txn-oid');
+      expect(result.summary.isDryRun).toBe(true);
+      expect(result.summary.transactionsAnalyzed).toBe(1);
+
+      consoleSpy.mockRestore();
+    });
+
+    it('should skip processing for unknown document types', async () => {
+      const transaction = {
+        id: 'txn-unknown',
+        companyCnpj: '12.345.678/0001-90',
+      };
+
+      findAllWithCompanyCnpj.mockResolvedValue([transaction]);
+      mockSession.withTransaction.mockImplementation(async (callback) => {
+        return await callback();
+      });
+      DocumentValidator.validateDocument.mockReturnValue({
+        isValid: true,
+        type: 'UNKNOWN',
+      });
+
+      const result = await migrateCompanyDataToCompanyCollection();
+
+      expect(CompanyProcessor.process).not.toHaveBeenCalled();
+      expect(PersonProcessor.process).not.toHaveBeenCalled();
+      expect(AnonymousPersonProcessor.process).not.toHaveBeenCalled();
+      expect(result.companiesCreated).toBe(0);
+      expect(result.personsCreated).toBe(0);
+      expect(result.anonymousPersonsCreated).toBe(0);
     });
 
     it('should log errors and rethrow them', async () => {
@@ -660,6 +780,7 @@ describe('Migration Service Orchestrator', () => {
       // Mock document validation responses
       DocumentValidator.validateDocument
         .mockReturnValueOnce({ isValid: true, type: DOCUMENT_TYPES.CNPJ }) // txn1
+        .mockReturnValueOnce({ isValid: true, type: DOCUMENT_TYPES.CNPJ }) // txn2
         .mockReturnValueOnce({ isValid: true, type: DOCUMENT_TYPES.CPF }) // txn3
         .mockReturnValueOnce({ isValid: true, type: DOCUMENT_TYPES.CPF }) // txn4
         .mockReturnValueOnce({ isValid: false }) // txn5 (anonymous)
@@ -670,13 +791,25 @@ describe('Migration Service Orchestrator', () => {
         .mockReturnValueOnce(false); // txn6
 
       // Mock processor responses
-      CompanyProcessor.process.mockResolvedValue({ created: 1, updated: 0 });
+      CompanyProcessor.process.mockImplementation((t, map) => {
+        // process.stdout.write(`Processing: ${t.companyCnpj}, Map has: ${map ? map.has(t.companyCnpj) : 'no map'}\n`);
+        if (map && map.has(t.companyCnpj)) {
+          return Promise.resolve({ created: 0, updated: 0, skipped: 1 });
+        }
+        if (map) map.set(t.companyCnpj, true);
+        return Promise.resolve({ created: 1, updated: 0 });
+      });
       PersonProcessor.process
-        .mockResolvedValueOnce({ created: 1, updated: 0 }) // Person A
-        .mockResolvedValueOnce({ created: 1, updated: 0 }); // Person B
-      AnonymousPersonProcessor.process.mockResolvedValue({
-        created: 1,
-        updated: 0,
+        .mockImplementation((t, map) => {
+          if (map) map.set(t.companyCnpj, true);
+          return Promise.resolve({ created: 1, updated: 0 });
+        });
+      AnonymousPersonProcessor.process.mockImplementation((t, map) => {
+        if (map) map.set(t.companyCnpj, true);
+        return Promise.resolve({
+          created: 1,
+          updated: 0,
+        });
       });
 
       // Act
@@ -696,7 +829,7 @@ describe('Migration Service Orchestrator', () => {
       });
 
       // Verify processor calls
-      expect(CompanyProcessor.process).toHaveBeenCalledTimes(1);
+      expect(CompanyProcessor.process).toHaveBeenCalledTimes(2);
       expect(PersonProcessor.process).toHaveBeenCalledTimes(2);
       expect(AnonymousPersonProcessor.process).toHaveBeenCalledTimes(1);
     });

@@ -504,6 +504,16 @@ export async function fixCompaniesEntities(dryRun = true) {
   }
 }
 
+export {
+  ensureNestedStructure,
+  fixCompanyBasicInfo,
+  fixCompanyStructure,
+  logCompanyProcessing,
+  processCompany,
+  processAllCompanies,
+  logResults,
+};
+
 // // This allows the script to be run directly from the command line
 // if (process.argv[1].endsWith('index.js')) {
 //   const dryRun = process.argv.includes('--dry-run');

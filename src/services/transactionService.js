@@ -245,7 +245,7 @@ export const updateTransactionFiscalBook = async (req, res) => {
   const id = req.params.id;
   const { fiscalBookId } = req.body;
 
-  if (!fiscalBookId) {
+  if (fiscalBookId === undefined || fiscalBookId === '') {
     return res.status(400).send({ message: 'Fiscal book ID is required' });
   }
 

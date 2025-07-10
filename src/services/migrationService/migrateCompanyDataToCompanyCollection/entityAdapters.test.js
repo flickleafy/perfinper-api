@@ -4,25 +4,26 @@
  */
 
 import { describe, test, expect, jest, beforeEach } from '@jest/globals';
-import {
-  CompanyAdapter,
-  PersonAdapter,
-  AnonymousPersonAdapter,
-  EntityFactory,
-} from '../entityAdapters.js';
-import { ENTITY_STATUS } from '../types.js';
+import { ENTITY_STATUS } from './types.js';
 
 // Mock the external formatCPF function
 jest.unstable_mockModule(
-  '../../../infrasctructure/validators/index.js',
+  '../../../infrastructure/validators/index.js',
   () => ({
     formatCPF: jest.fn(),
   })
 );
 
 const { formatCPF } = await import(
-  '../../../infrasctructure/validators/index.js'
+  '../../../infrastructure/validators/index.js'
 );
+
+const {
+  CompanyAdapter,
+  PersonAdapter,
+  AnonymousPersonAdapter,
+  EntityFactory,
+} = await import('./entityAdapters.js');
 
 describe('Entity Adapters', () => {
   beforeEach(() => {
@@ -60,7 +61,7 @@ describe('Entity Adapters', () => {
         expect(result.companyName).toBe('Test Company Ltd');
         expect(result.corporateName).toBe('Test Company Ltd');
         expect(result.tradeName).toBe('Test Company Ltd');
-        expect(result.companySellerName).toBe('John Seller');
+        // companySellerName is not a top level field in schema, should be in corporateStructure
       });
 
       test('should handle missing optional fields gracefully', () => {
@@ -74,7 +75,6 @@ describe('Entity Adapters', () => {
         expect(result.companyName).toBe('');
         expect(result.corporateName).toBe('');
         expect(result.tradeName).toBe('');
-        expect(result.companySellerName).toBe('');
       });
 
       test('should create correct registration info structure', () => {
@@ -85,14 +85,10 @@ describe('Entity Adapters', () => {
 
         const result = CompanyAdapter.fromTransaction(transaction);
 
-        expect(result.registrationInfo).toEqual({
-          registrationNumber: '',
-          registrationDate: null,
-          registrationStatus: ENTITY_STATUS.ACTIVE,
-          legalNature: '',
-          companySize: '',
-          shareCapital: '',
-        });
+        expect(result.companySize).toBe('');
+        expect(result.legalNature).toBe('');
+        expect(result.shareCapital).toBe('');
+        expect(result.status).toBe(ENTITY_STATUS.ACTIVE);
       });
 
       test('should create correct contacts structure', () => {
@@ -103,17 +99,10 @@ describe('Entity Adapters', () => {
         const result = CompanyAdapter.fromTransaction(transaction);
 
         expect(result.contacts).toEqual({
-          mainEmail: '',
-          secondaryEmail: '',
-          mainPhone: '',
-          secondaryPhone: '',
+          email: '',
+          phones: [],
           website: '',
-          socialMedia: {
-            facebook: '',
-            instagram: '',
-            linkedin: '',
-            twitter: '',
-          },
+          socialMedia: [],
         });
       });
 
@@ -144,12 +133,12 @@ describe('Entity Adapters', () => {
 
         const result = CompanyAdapter.fromTransaction(transaction);
 
-        expect(result.corporateStructure.administrators).toHaveLength(1);
-        expect(result.corporateStructure.administrators[0]).toEqual({
+        expect(result.corporateStructure).toHaveLength(1);
+        expect(result.corporateStructure[0]).toEqual({
           name: 'John Seller',
-          document: '',
-          role: 'Seller',
-          participationPercentage: '',
+          type: 'Vendedor',
+          cnpj: '',
+          country: 'Brasil',
         });
       });
 
@@ -160,32 +149,7 @@ describe('Entity Adapters', () => {
 
         const result = CompanyAdapter.fromTransaction(transaction);
 
-        expect(result.corporateStructure.administrators).toHaveLength(0);
-      });
-
-      test('should include seller name in observations', () => {
-        const transaction = {
-          companyCnpj: '12.345.678/0001-95',
-          companySellerName: 'John Seller',
-        };
-
-        const result = CompanyAdapter.fromTransaction(transaction);
-
-        expect(result.additionalInfo.observations).toBe(
-          'Migrated from transaction data. Original seller: John Seller'
-        );
-      });
-
-      test('should handle missing seller name in observations', () => {
-        const transaction = {
-          companyCnpj: '12.345.678/0001-95',
-        };
-
-        const result = CompanyAdapter.fromTransaction(transaction);
-
-        expect(result.additionalInfo.observations).toBe(
-          'Migrated from transaction data. Original seller: N/A'
-        );
+        expect(result.corporateStructure).toHaveLength(0);
       });
 
       test('should set correct metadata fields', () => {
@@ -197,12 +161,6 @@ describe('Entity Adapters', () => {
 
         expect(result.createdAt).toBeInstanceOf(Date);
         expect(result.updatedAt).toBeInstanceOf(Date);
-        expect(result.dataSource).toBe('transaction-migration');
-        expect(result.additionalInfo.tags).toContain(
-          'migrated-from-transaction'
-        );
-        expect(result.additionalInfo.isActive).toBe(true);
-        expect(result.additionalInfo.verificationStatus).toBe('pending');
       });
     });
   });

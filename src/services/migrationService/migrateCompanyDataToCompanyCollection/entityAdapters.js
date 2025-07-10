@@ -30,18 +30,18 @@ export class CompanyAdapter {
       // Basic company information
       companyName: transaction.companyName || '',
       companyCnpj: transaction.companyCnpj || '',
-
-      // Registration information
+      
+      // Registration information (Root level in Schema)
       corporateName: transaction.companyName || '',
       tradeName: transaction.companyName || '',
       foundationDate: null,
       companySize: '',
       legalNature: '',
-      microEntrepreneurOption: false,
-      simplifiedTaxOption: false,
+      microEntrepreneurOption: false, // Default from schema
+      simplifiedTaxOption: false, // Default from schema
       shareCapital: '',
       companyType: 'Matriz',
-      status: 'Ativa', // Using enum value from CompanyModel: 'Ativa', 'Inativa', 'Suspensa', 'Baixada'
+      status: ENTITY_STATUS.ACTIVE, // 'Ativa'
       statusDate: null,
 
       // Contact information
@@ -73,12 +73,12 @@ export class CompanyAdapter {
         secondary: [],
       },
 
-      // Corporate structure - following the exact schema
+      // Corporate structure - Array of objects as per Schema
       corporateStructure: transaction.companySellerName
         ? [
             {
               name: transaction.companySellerName || '',
-              type: 'Vendedor', // Using the enum value from CompanyModel
+              type: 'Vendedor', // Must match enum ['Administrador', 'Sócio', 'Procurador', 'Vendedor']
               cnpj: '',
               country: 'Brasil',
             },
@@ -88,7 +88,7 @@ export class CompanyAdapter {
       // Transaction statistics
       statistics: {
         totalTransactions: 0,
-        totalTransactionValue: '0',
+        totalTransactionValue: '0', // String in Schema
         lastTransaction: null,
       },
 
@@ -96,6 +96,7 @@ export class CompanyAdapter {
       createdAt: new Date(),
       updatedAt: new Date(),
       sourceTransaction: transaction._id,
+      dataSource: 'transaction-migration',
     };
   }
 }
@@ -137,6 +138,9 @@ export class PersonAdapter {
     ) {
       personData.notes = `Nome do vendedor: ${transaction.companySellerName}`;
     }
+    
+    // Ensure dataSource is present as expected by tests/factory
+    personData.dataSource = 'transaction-migration';
 
     return personData;
   }
@@ -174,6 +178,7 @@ export class AnonymousPersonAdapter {
 
       createdAt: new Date(),
       updatedAt: new Date(),
+      dataSource: 'transaction-migration',
     };
 
     // Add seller name as additional info if different from company name

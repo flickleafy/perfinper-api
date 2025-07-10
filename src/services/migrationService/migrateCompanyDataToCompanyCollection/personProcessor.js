@@ -96,15 +96,24 @@ export class PersonProcessor {
           console.log(`🆕 Created person: ${newPersonData.fullName}`);
 
           // Update transaction with the new personId
-          await TransactionUpdater.updateWithPersonId(
+          const updateResult = await TransactionUpdater.updateWithPersonId(
             transaction,
             createdPerson.id,
             session
           );
+
+          if (!updateResult) {
+            console.warn(
+              `⚠️ Transaction update failed for Created Person: ${createdPerson.id}`
+            );
+          }
+
+          processedEntities.set(personIdentifier, true);
+          return { created: 1, skipped: 0, updated: updateResult ? 1 : 0 };
         }
 
         processedEntities.set(personIdentifier, true);
-        return { created: 1, skipped: 0, updated: 1 };
+        return { created: 1, skipped: 0, updated: 1 }; // Fallback if regular mode logic changes
       }
 
       return EMPTY_RESULT;

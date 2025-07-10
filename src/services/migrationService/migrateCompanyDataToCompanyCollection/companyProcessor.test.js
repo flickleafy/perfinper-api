@@ -4,7 +4,7 @@
  */
 
 import { jest } from '@jest/globals';
-import { EMPTY_RESULT, DOCUMENT_TYPES } from '../types.js';
+import { EMPTY_RESULT, DOCUMENT_TYPES } from './types.js';
 
 // Define mock functions first
 const mockFindByCnpj = jest.fn();
@@ -17,16 +17,33 @@ const mockAddCnpjRecord = jest.fn();
 const mockAddFailedRecord = jest.fn();
 
 // Mock the dynamic import of dryRunUtils.js
-jest.mock('../dryRunUtils.js', () => ({
-  __esModule: true, // This is important for ES modules
+jest.unstable_mockModule('./dryRunUtils.js', () => ({
   addExistingEntity: mockAddExistingEntity,
   incrementTransactionUpdates: mockIncrementTransactionUpdates,
   addCnpjRecord: mockAddCnpjRecord,
   addFailedRecord: mockAddFailedRecord,
 }));
 
+jest.unstable_mockModule('../../../repository/companyRepository.js', () => ({
+  findByCnpj: mockFindByCnpj,
+  insert: mockInsertCompany,
+}));
+
+jest.unstable_mockModule('./transactionUpdater.js', () => ({
+  TransactionUpdater: {
+    updateWithCompanyId: mockUpdateWithCompanyId,
+  },
+}));
+
+jest.unstable_mockModule('./entityAdapters.js', () => ({
+  CompanyAdapter: {
+    fromTransaction: mockFromTransaction,
+  },
+}));
+
+const { CompanyProcessor } = await import('./companyProcessor.js');
+
 describe('CompanyProcessor', () => {
-  let CompanyProcessor; // Declare here, will be set in beforeEach
   let mockSession;
   let processedEntities;
   let mockDryRunStats;
@@ -42,39 +59,6 @@ describe('CompanyProcessor', () => {
     mockIncrementTransactionUpdates.mockReset();
     mockAddCnpjRecord.mockReset();
     mockAddFailedRecord.mockReset();
-
-    // 2. Reset module cache
-    jest.resetModules();
-
-    // Use jest.doMock for modules imported by companyProcessor.js
-    // These mocks are not hoisted and apply after resetModules and before the import of CompanyProcessor
-    jest.doMock('../../../../repository/companyRepository.js', () => {
-      console.log(
-        '[TEST DEBUG] Mocking companyRepository.js. mockFindByCnpj is defined:',
-        typeof mockFindByCnpj === 'function'
-      );
-      return {
-        __esModule: true,
-        findByCnpj: mockFindByCnpj,
-        insert: mockInsertCompany,
-      };
-    });
-
-    jest.doMock('../transactionUpdater.js', () => ({
-      TransactionUpdater: {
-        updateWithCompanyId: mockUpdateWithCompanyId,
-      },
-    }));
-
-    jest.doMock('../entityAdapters.js', () => ({
-      CompanyAdapter: {
-        fromTransaction: mockFromTransaction,
-      },
-    }));
-
-    // Import the module under test here, after mocks are set by jest.doMock
-    const companyProcessorModule = await import('../companyProcessor.js');
-    CompanyProcessor = companyProcessorModule.CompanyProcessor;
 
     mockSession = { sessionId: 'test-session' };
     processedEntities = new Map();
@@ -125,7 +109,7 @@ describe('CompanyProcessor', () => {
           mockSession
         );
         expect(result).toEqual({ created: 0, skipped: 1, updated: 1 });
-        expect(processedEntities.get('12.345.678/0001-90')).toBe(true);
+        expect(processedEntities.get('12.345.678/0001-90')).toBeTruthy();
       });
 
       test('should handle dry-run mode for existing company', async () => {
@@ -237,7 +221,7 @@ describe('CompanyProcessor', () => {
           mockSession
         );
         expect(result).toEqual({ created: 0, skipped: 1, updated: 1 });
-        expect(processedEntities.get('12.345.678/0001-90')).toBe(true);
+        expect(processedEntities.get('12.345.678/0001-90')).toBeTruthy();
       });
 
       test('should use default dryRun parameter when not specified', async () => {
@@ -268,6 +252,7 @@ describe('CompanyProcessor', () => {
           mockSession
         );
         expect(result).toEqual({ created: 0, skipped: 1, updated: 1 });
+        expect(processedEntities.get('12.345.678/0001-90')).toBeTruthy();
       });
     });
 
@@ -311,7 +296,7 @@ describe('CompanyProcessor', () => {
           mockSession
         );
         expect(result).toEqual({ created: 1, skipped: 0, updated: 1 });
-        expect(processedEntities.get('12.345.678/0001-90')).toBe(true);
+        expect(processedEntities.get('12.345.678/0001-90')).toBeTruthy();
       });
 
       test('should handle dry-run mode for new company', async () => {
@@ -422,7 +407,7 @@ describe('CompanyProcessor', () => {
           mockSession
         );
         expect(result).toEqual({ created: 1, skipped: 0, updated: 0 });
-        expect(processedEntities.get('12.345.678/0001-90')).toBe(true);
+        expect(processedEntities.get('12.345.678/0001-90')).toBeTruthy();
       });
 
       test('should handle company creation returning null (not dry run)', async () => {
@@ -449,7 +434,7 @@ describe('CompanyProcessor', () => {
         );
         expect(mockUpdateWithCompanyId).not.toHaveBeenCalled();
         expect(result).toEqual(EMPTY_RESULT);
-        expect(processedEntities.get('12.345.678/0001-90')).toBe(true); // Should be marked as processed to avoid retries
+        expect(processedEntities.get('12.345.678/0001-90')).toBeTruthy(); // Should be marked as processed to avoid retries
       });
 
       test('should handle company with only tradeName (no corporateName)', async () => {
@@ -602,7 +587,7 @@ describe('CompanyProcessor', () => {
       expect(result).toBeNull();
     });
 
-    test.skip('should return null when companyCnpj is 0', async () => {
+    test('should return null when companyCnpj is 0', async () => {
       const transactionWithZeroCnpj = {
         ...mockTransaction,
         companyCnpj: 0,
@@ -745,7 +730,7 @@ describe('CompanyProcessor', () => {
       expect(processedEntities.get('22.222.222/0001-22')).toEqual(entity2);
     });
 
-    test.skip('should handle multiple transactions with same CNPJ efficiently', async () => {
+    test('should handle multiple transactions with same CNPJ efficiently', async () => {
       const existingCompany = {
         id: 'existing-company-123',
         cnpj: '12.345.678/0001-90',
@@ -792,7 +777,7 @@ describe('CompanyProcessor', () => {
       expect(mockUpdateWithCompanyId).toHaveBeenCalledTimes(2);
 
       // Both transactions should be marked as processed
-      expect(processedEntities.get('12.345.678/0001-90')).toBe(true);
+      expect(processedEntities.get('12.345.678/0001-90')).toBeTruthy();
     });
   });
 });

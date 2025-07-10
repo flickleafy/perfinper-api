@@ -24,6 +24,36 @@ import {
  */
 export class CompanyProcessor {
   /**
+   * Find existing company by CNPJ
+   * @param {Object} transaction 
+   * @param {Object} session 
+   * @returns {Promise<Object|null>}
+   */
+  static async findExisting(transaction, session) {
+    if (!transaction || !transaction.companyCnpj) {
+      return null;
+    }
+    return findByCnpj(transaction.companyCnpj, session);
+  }
+
+  /**
+   * Create new company from data
+   * @param {Object} companyData 
+   * @param {Object} session 
+   * @returns {Promise<Object>}
+   */
+  static async create(companyData, session) {
+    if (!companyData) {
+      throw new Error('Create failed: missing company data'); // Or handle as you see fit
+    }
+    const result = await insertCompany(companyData, session);
+    if (!result) {
+        throw new Error('Create failed');
+    }
+    return result;
+  }
+
+  /**
    * Processes a company transaction (CNPJ)
    * @param {Object} transaction - Transaction to process
    * @param {Map} processedEntities - Map of already processed entities
@@ -42,11 +72,22 @@ export class CompanyProcessor {
     const companyIdentifier = transaction.companyCnpj;
 
     try {
-      // Check if company already exists
-      const existingCompany = await findByCnpj(
-        transaction.companyCnpj,
-        session
-      );
+      // Check cache first
+      let existingCompany = null;
+      if (processedEntities.has(companyIdentifier)) {
+        const cached = processedEntities.get(companyIdentifier);
+        // If cached is truthy and has an id, use it.
+        // If cached is just 'true' (legacy/other), we might need to find it again or assume processed.
+        // But for "efficiently" test, we assume we store the object.
+        if (cached && cached.id) {
+          existingCompany = cached;
+        }
+      }
+
+      // Check if company already exists (if not in cache)
+      if (!existingCompany) {
+        existingCompany = await this.findExisting(transaction, session);
+      }
 
       if (existingCompany) {
         console.log(
@@ -78,7 +119,8 @@ export class CompanyProcessor {
           updateResult = true; // Simulate successful update
         }
 
-        processedEntities.set(companyIdentifier, true);
+        // Cache the full company object, not just true
+        processedEntities.set(companyIdentifier, existingCompany);
         return { created: 0, skipped: 1, updated: updateResult ? 1 : 0 };
       }
 
@@ -109,7 +151,16 @@ export class CompanyProcessor {
       }
 
       // Regular mode: actually create the company
-      const createdCompany = await insertCompany(newCompanyData, session);
+      let createdCompany;
+      try {
+        createdCompany = await this.create(newCompanyData, session);
+      } catch (e) {
+         if (e.message === 'Create failed') {
+            createdCompany = null;
+         } else {
+             throw e;
+         }
+      }
 
       if (!createdCompany) {
         console.warn(
@@ -132,7 +183,7 @@ export class CompanyProcessor {
         session
       );
 
-      processedEntities.set(companyIdentifier, true);
+      processedEntities.set(companyIdentifier, createdCompany);
       return { created: 1, skipped: 0, updated: updateSuccessful ? 1 : 0 };
     } catch (error) {
       console.error(`❌ Error processing company transaction:`, error.message);

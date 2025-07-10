@@ -14,13 +14,17 @@ export default {
 
   // Coverage configuration
   collectCoverage: true,
+  coverageProvider: 'v8',
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html', 'json-summary'],
-  collectCoverageFrom: [
-    'src/services/migrationService/**/*.js',
-    '!src/services/migrationService/**/*.test.js',
-    '!src/services/migrationService/**/test-*.js',
-  ],
+  coverageThreshold: {
+    global: {
+      branches: 90,
+      functions: 90,
+      lines: 90,
+      statements: 90,
+    },
+  },
 
   // Transform configuration for ES modules
   transform: {

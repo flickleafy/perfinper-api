@@ -4,7 +4,6 @@
  */
 
 import { describe, test, expect, jest, beforeEach } from '@jest/globals';
-import { TransactionUpdater } from '../transactionUpdater.js';
 
 // Mock the transaction repository
 jest.unstable_mockModule(
@@ -28,11 +27,26 @@ beforeEach(() => {
   };
 });
 
+// Mock Mongoose to accept test IDs
+jest.unstable_mockModule('mongoose', () => ({
+  default: {
+    Types: {
+      ObjectId: {
+        isValid: () => true, // Accept all IDs in tests
+      },
+    },
+  },
+}));
+const mongoose = await import('mongoose');
+
+const { TransactionUpdater } = await import('./transactionUpdater.js');
+
 describe('TransactionUpdater', () => {
   const mockSession = { id: 'session123' };
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mongoose.default.Types.ObjectId.isValid = jest.fn().mockReturnValue(true);
   });
 
   afterAll(() => {
@@ -76,6 +90,28 @@ describe('TransactionUpdater', () => {
       );
     });
 
+    test('uses _id when transaction id is missing', async () => {
+      const transaction = {
+        _id: { toString: () => 'transaction-from-oid' },
+        companyId: null,
+      };
+
+      updateTransaction.mockResolvedValue({ modifiedCount: 1 });
+
+      const result = await TransactionUpdater.updateWithCompanyId(
+        transaction,
+        'company123',
+        mockSession
+      );
+
+      expect(result).toBe(true);
+      expect(updateTransaction).toHaveBeenCalledWith(
+        'transaction-from-oid',
+        expect.any(Object),
+        mockSession
+      );
+    });
+
     test('should skip update when companyId is already set', async () => {
       const transaction = {
         id: 'transaction123',
@@ -93,6 +129,45 @@ describe('TransactionUpdater', () => {
       expect(result).toBe(false);
       expect(updateTransaction).not.toHaveBeenCalled();
       expect(console.log).not.toHaveBeenCalled();
+    });
+
+    test('should skip update when transaction id is missing', async () => {
+      const transaction = {
+        companyId: null,
+      };
+
+      const result = await TransactionUpdater.updateWithCompanyId(
+        transaction,
+        'company123',
+        mockSession
+      );
+
+      expect(result).toBe(false);
+      expect(updateTransaction).not.toHaveBeenCalled();
+      expect(console.log).toHaveBeenCalledWith(
+        '⚠️ Cannot update transaction - missing ID'
+      );
+    });
+
+    test('should skip update when companyId is invalid', async () => {
+      const transaction = {
+        id: 'transaction123',
+        companyId: null,
+      };
+
+      mongoose.default.Types.ObjectId.isValid.mockReturnValueOnce(false);
+
+      const result = await TransactionUpdater.updateWithCompanyId(
+        transaction,
+        'invalid-id',
+        mockSession
+      );
+
+      expect(result).toBe(false);
+      expect(updateTransaction).not.toHaveBeenCalled();
+      expect(console.log).toHaveBeenCalledWith(
+        '⚠️ Skipped updating transaction transaction123 - invalid companyId provided: invalid-id'
+      );
     });
 
     test('should skip update when companyId is undefined but truthy', async () => {
@@ -198,6 +273,46 @@ describe('TransactionUpdater', () => {
       );
     });
 
+    test('uses _id when transaction id is missing', async () => {
+      const transaction = {
+        _id: { toString: () => 'transaction-person-oid' },
+        companyId: null,
+      };
+
+      updateTransaction.mockResolvedValue({ modifiedCount: 1 });
+
+      const result = await TransactionUpdater.updateWithPersonId(
+        transaction,
+        'person456',
+        mockSession
+      );
+
+      expect(result).toBe(true);
+      expect(updateTransaction).toHaveBeenCalledWith(
+        'transaction-person-oid',
+        expect.any(Object),
+        mockSession
+      );
+    });
+
+    test('should skip update when transaction id is missing', async () => {
+      const transaction = {
+        companyId: null,
+      };
+
+      const result = await TransactionUpdater.updateWithPersonId(
+        transaction,
+        'person456',
+        mockSession
+      );
+
+      expect(result).toBe(false);
+      expect(updateTransaction).not.toHaveBeenCalled();
+      expect(console.log).toHaveBeenCalledWith(
+        '⚠️ Cannot update transaction - missing ID'
+      );
+    });
+
     test('should skip update when companyId is already set', async () => {
       const transaction = {
         id: 'transaction456',
@@ -215,6 +330,27 @@ describe('TransactionUpdater', () => {
       expect(result).toBe(false);
       expect(updateTransaction).not.toHaveBeenCalled();
       expect(console.log).not.toHaveBeenCalled();
+    });
+
+    test('should skip update when personId is invalid', async () => {
+      const transaction = {
+        id: 'transaction456',
+        companyId: null,
+      };
+
+      mongoose.default.Types.ObjectId.isValid.mockReturnValueOnce(false);
+
+      const result = await TransactionUpdater.updateWithPersonId(
+        transaction,
+        'invalid-id',
+        mockSession
+      );
+
+      expect(result).toBe(false);
+      expect(updateTransaction).not.toHaveBeenCalled();
+      expect(console.log).toHaveBeenCalledWith(
+        '⚠️ Skipped updating transaction transaction456 - invalid personId provided: invalid-id'
+      );
     });
 
     test('should handle repository update errors gracefully', async () => {

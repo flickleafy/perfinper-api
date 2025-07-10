@@ -14,7 +14,7 @@ import {
   incrementTransactionUpdates,
   displayDryRunStatistics,
   generateDryRunReport,
-} from '../dryRunUtils.js';
+} from './dryRunUtils.js';
 
 // Mock console methods
 const originalConsole = console;
@@ -97,6 +97,17 @@ describe('DryRunUtils', () => {
 
       expect(stats.cnpjRecords[0].name).toBe('Unnamed Company');
     });
+
+    test('should use transaction id when _id is missing', () => {
+      const stats = createDryRunStats();
+      const identifier = '12.345.678/0001-95';
+      const data = { cnpj: identifier, corporateName: 'Company' };
+      const transaction = { id: 'trans-id' };
+
+      addCnpjRecord(stats, identifier, data, transaction);
+
+      expect(stats.cnpjRecords[0].source).toBe('Transaction ID: trans-id');
+    });
   });
 
   describe('addCpfRecord', () => {
@@ -132,6 +143,17 @@ describe('DryRunUtils', () => {
 
       expect(stats.cpfRecords[0].name).toBe('Unnamed Person');
     });
+
+    test('should use unknown source when transaction has no id', () => {
+      const stats = createDryRunStats();
+      const identifier = '123.456.789-01';
+      const data = { fullName: 'No Id' };
+      const transaction = {};
+
+      addCpfRecord(stats, identifier, data, transaction);
+
+      expect(stats.cpfRecords[0].source).toBe('Transaction ID: Unknown');
+    });
   });
 
   describe('addAnonymousCpfRecord', () => {
@@ -156,6 +178,19 @@ describe('DryRunUtils', () => {
         source: 'Transaction ID: trans789',
       });
       expect(stats.anonymousPersonsWouldCreate).toBe(1);
+    });
+
+    test('should use transaction id when _id is missing', () => {
+      const stats = createDryRunStats();
+      const identifier = '***456.789-**';
+      const data = { fullName: 'Anon' };
+      const transaction = { id: 'trans-anon' };
+
+      addAnonymousCpfRecord(stats, identifier, data, transaction);
+
+      expect(stats.anonymousCpfRecords[0].source).toBe(
+        'Transaction ID: trans-anon'
+      );
     });
   });
 
@@ -212,6 +247,18 @@ describe('DryRunUtils', () => {
 
       expect(stats.existingEntities[0].name).toBe('Trade Name Company');
     });
+
+    test('should handle unnamed existing entity', () => {
+      const stats = createDryRunStats();
+      const identifier = '12.345.678/0001-95';
+      const existingEntity = {
+        id: 'company999',
+      };
+
+      addExistingEntity(stats, identifier, existingEntity, 'company');
+
+      expect(stats.existingEntities[0].name).toBe('Unnamed Entity');
+    });
   });
 
   describe('addFailedRecord', () => {
@@ -251,6 +298,18 @@ describe('DryRunUtils', () => {
       addFailedRecord(stats, transaction, error);
 
       expect(stats.failedRecords[0].identifier).toBe('Unknown');
+    });
+
+    test('should use unknown id when transaction has no id', () => {
+      const stats = createDryRunStats();
+      const transaction = {
+        companyCnpj: '99.999.999/0001-99',
+      };
+      const error = 'Invalid data';
+
+      addFailedRecord(stats, transaction, error);
+
+      expect(stats.failedRecords[0].transaction.id).toBe('Unknown');
     });
   });
 
@@ -319,6 +378,46 @@ describe('DryRunUtils', () => {
       );
       expect(console.log).toHaveBeenCalledWith(
         expect.stringContaining('No actual changes were made')
+      );
+    });
+
+    test('should display overflow counts for long lists', () => {
+      const stats = createDryRunStats();
+
+      for (let i = 0; i < 12; i++) {
+        addCnpjRecord(
+          stats,
+          `11.111.111/000${i}-11`,
+          { corporateName: `Company ${i}` },
+          { _id: `trans-cnpj-${i}` }
+        );
+        addCpfRecord(
+          stats,
+          `123.456.789-0${i}`,
+          { fullName: `Person ${i}` },
+          { _id: `trans-cpf-${i}` }
+        );
+        addAnonymousCpfRecord(
+          stats,
+          `***.***.***-${i}${i}`,
+          { fullName: `Anonymous ${i}` },
+          { _id: `trans-anon-${i}` }
+        );
+      }
+
+      for (let i = 0; i < 7; i++) {
+        addExistingEntity(
+          stats,
+          `22.222.222/000${i}-22`,
+          { corporateName: `Existing ${i}` },
+          'company'
+        );
+      }
+
+      displayDryRunStatistics(stats);
+
+      expect(console.log).toHaveBeenCalledWith(
+        expect.stringContaining('... and 2 more')
       );
     });
   });
