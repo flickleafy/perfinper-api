@@ -4,8 +4,7 @@
  */
 
 import { describe, test, expect, jest, beforeEach } from '@jest/globals';
-import { PersonProcessor } from '../personProcessor.js';
-import { EMPTY_RESULT } from '../types.js';
+import { EMPTY_RESULT } from './types.js';
 
 // Mock dependencies
 jest.unstable_mockModule('../../../repository/personRepository.js', () => ({
@@ -25,11 +24,25 @@ jest.unstable_mockModule('./transactionUpdater.js', () => ({
   },
 }));
 
+jest.unstable_mockModule('./dryRunUtils.js', () => ({
+  addExistingEntity: jest.fn(),
+  incrementTransactionUpdates: jest.fn(),
+  addCpfRecord: jest.fn(),
+  addFailedRecord: jest.fn(),
+}));
+
 const { findByCpf, insert: insertPerson } = await import(
   '../../../repository/personRepository.js'
 );
 const { PersonAdapter } = await import('./entityAdapters.js');
 const { TransactionUpdater } = await import('./transactionUpdater.js');
+const {
+  addExistingEntity,
+  incrementTransactionUpdates,
+  addCpfRecord,
+  addFailedRecord,
+} = await import('./dryRunUtils.js');
+const { PersonProcessor } = await import('./personProcessor.js');
 
 // Mock console methods
 const originalConsole = console;
@@ -116,6 +129,43 @@ describe('PersonProcessor', () => {
       expect(processedEntities.get('123.456.789-01')).toBe(true);
     });
 
+    test('should track existing person in dry run', async () => {
+      const transaction = {
+        id: 'transaction-dry-existing',
+        companyCnpj: '555.666.777-88',
+        companyName: 'Dry Existing Person',
+      };
+
+      const existingPerson = {
+        id: 'person-dry-existing',
+        fullName: 'Dry Existing Person',
+        cpf: '555.666.777-88',
+      };
+
+      const dryRunStats = { id: 'stats-existing' };
+
+      findByCpf.mockResolvedValue(existingPerson);
+
+      const result = await PersonProcessor.process(
+        transaction,
+        processedEntities,
+        mockSession,
+        true,
+        dryRunStats
+      );
+
+      expect(addExistingEntity).toHaveBeenCalledWith(
+        dryRunStats,
+        '555.666.777-88',
+        existingPerson,
+        'person'
+      );
+      expect(incrementTransactionUpdates).toHaveBeenCalledWith(dryRunStats);
+      expect(TransactionUpdater.updateWithPersonId).not.toHaveBeenCalled();
+      expect(result).toEqual({ created: 0, skipped: 1, updated: 1 });
+      expect(processedEntities.get('555.666.777-88')).toBe(true);
+    });
+
     test('should create new person when none exists', async () => {
       const transaction = {
         id: 'transaction456',
@@ -158,6 +208,45 @@ describe('PersonProcessor', () => {
       expect(console.log).toHaveBeenCalledWith('🆕 Created person: Jane Smith');
     });
 
+    test('should collect dry run stats when creating new person', async () => {
+      const transaction = {
+        id: 'transaction-dry-new',
+        companyCnpj: '444.333.222-11',
+        companyName: 'Dry New Person',
+      };
+
+      const newPersonData = {
+        fullName: 'Dry New Person',
+        cpf: '444.333.222-11',
+        status: 'active',
+      };
+
+      const dryRunStats = { id: 'stats-new' };
+
+      findByCpf.mockResolvedValue(null);
+      PersonAdapter.fromTransaction.mockReturnValue(newPersonData);
+
+      const result = await PersonProcessor.process(
+        transaction,
+        processedEntities,
+        mockSession,
+        true,
+        dryRunStats
+      );
+
+      expect(addCpfRecord).toHaveBeenCalledWith(
+        dryRunStats,
+        '444.333.222-11',
+        newPersonData,
+        transaction
+      );
+      expect(incrementTransactionUpdates).toHaveBeenCalledWith(dryRunStats);
+      expect(insertPerson).not.toHaveBeenCalled();
+      expect(TransactionUpdater.updateWithPersonId).not.toHaveBeenCalled();
+      expect(result).toEqual({ created: 1, skipped: 0, updated: 1 });
+      expect(processedEntities.get('444.333.222-11')).toBe(true);
+    });
+
     test('should handle case when PersonAdapter returns null', async () => {
       const transaction = {
         id: 'transaction789',
@@ -197,6 +286,33 @@ describe('PersonProcessor', () => {
       expect(console.error).toHaveBeenCalledWith(
         '❌ Error processing person transaction:',
         'Database connection failed'
+      );
+    });
+
+    test('should track failed record in dry run', async () => {
+      const transaction = {
+        id: 'transaction-dry-error',
+        companyCnpj: '000.000.000-00',
+        companyName: 'Dry Error Person',
+      };
+
+      const dryRunStats = { id: 'stats-error' };
+      findByCpf.mockRejectedValue(new Error('Dry run failure'));
+
+      await expect(
+        PersonProcessor.process(
+          transaction,
+          processedEntities,
+          mockSession,
+          true,
+          dryRunStats
+        )
+      ).rejects.toThrow('Dry run failure');
+
+      expect(addFailedRecord).toHaveBeenCalledWith(
+        dryRunStats,
+        transaction,
+        'Dry run failure'
       );
     });
 

@@ -32,10 +32,10 @@
   "scripts": {
     "start": "nodemon src/index.js",
     "prod": "node src/index.js",
-    "test": "NODE_OPTIONS='--experimental-vm-modules' jest --runInBand",
-    "test:watch": "NODE_OPTIONS='--experimental-vm-modules' jest --watch --runInBand",
-    "test:coverage": "NODE_OPTIONS='--experimental-vm-modules' jest --coverage --runInBand",
-    "test:migration": "NODE_OPTIONS='--experimental-vm-modules' jest src/services/migrationService/migrateCompanyDataToCompanyCollection/__tests__ --runInBand"
+    "test": "NODE_OPTIONS='--experimental-vm-modules' jest --runInBand --silent",
+    "test:watch": "NODE_OPTIONS='--experimental-vm-modules' jest --watch --runInBand --silent",
+    "test:coverage": "NODE_OPTIONS='--experimental-vm-modules' jest --coverage --runInBand --silent",
+    "test:migration": "NODE_OPTIONS='--experimental-vm-modules' jest src/services/migrationService/migrateCompanyDataToCompanyCollection/__tests__ --runInBand --silent"
   },
   "nodemonConfig": {
     "ignore": [

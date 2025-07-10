@@ -30,6 +30,13 @@ export class TransactionUpdater {
         return false;
       }
 
+      // Check if transaction already has a companyId set
+      if (transaction.companyId) {
+        // Log skipped message (optional, but good for debugging)
+        // console.log(`⚠️ Skipped updating transaction ${transactionId} - companyId already set: ${transaction.companyId}`);
+        return false;
+      }
+
       // Check if provided companyId is valid MongoDB ObjectId
       if (companyId && mongoose.Types.ObjectId.isValid(companyId)) {
         const updateData = {
@@ -76,6 +83,11 @@ export class TransactionUpdater {
 
       if (!transactionId) {
         console.log(`⚠️ Cannot update transaction - missing ID`);
+        return false;
+      }
+
+      // Check if transaction already has a companyId set (or personId/anonymousPersonId which use the same field)
+      if (transaction.companyId) {
         return false;
       }
 

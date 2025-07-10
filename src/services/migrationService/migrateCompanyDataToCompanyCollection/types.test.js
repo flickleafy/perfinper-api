@@ -10,7 +10,7 @@ import {
   EMPTY_RESULT,
   ANONYMIZATION_PATTERNS,
   VALIDATION_CONSTANTS,
-} from '../types.js';
+} from './types.js';
 
 describe('Types Constants', () => {
   describe('DOCUMENT_TYPES', () => {

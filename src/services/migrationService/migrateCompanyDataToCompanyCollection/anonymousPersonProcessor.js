@@ -99,11 +99,20 @@ export class AnonymousPersonProcessor {
           console.log(`🆕 Created anonymous person: ${newPersonData.fullName}`);
 
           // Update transaction with the new personId
-          await TransactionUpdater.updateWithAnonymousPersonId(
+          const updateResult = await TransactionUpdater.updateWithAnonymousPersonId(
             transaction,
             createdPerson.id,
             session
           );
+
+          if (!updateResult) {
+            console.warn(
+              `⚠️ Transaction update failed for Created Person: ${createdPerson.id}`
+            );
+          }
+
+          processedEntities.set(personIdentifier, true);
+          return { created: 1, skipped: 0, updated: updateResult ? 1 : 0 };
         }
 
         processedEntities.set(personIdentifier, true);

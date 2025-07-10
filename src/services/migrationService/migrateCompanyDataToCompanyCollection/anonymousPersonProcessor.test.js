@@ -4,8 +4,7 @@
  */
 
 import { describe, test, expect, jest, beforeEach } from '@jest/globals';
-import { AnonymousPersonProcessor } from '../anonymousPersonProcessor.js';
-import { EMPTY_RESULT } from '../types.js';
+import { EMPTY_RESULT } from './types.js';
 
 // Mock dependencies
 jest.unstable_mockModule('../../../repository/personRepository.js', () => ({
@@ -25,11 +24,25 @@ jest.unstable_mockModule('./transactionUpdater.js', () => ({
   },
 }));
 
+jest.unstable_mockModule('./dryRunUtils.js', () => ({
+  addExistingEntity: jest.fn(),
+  incrementTransactionUpdates: jest.fn(),
+  addAnonymousCpfRecord: jest.fn(),
+  addFailedRecord: jest.fn(),
+}));
+
 const { findByCpf, insert: insertPerson } = await import(
   '../../../repository/personRepository.js'
 );
 const { AnonymousPersonAdapter } = await import('./entityAdapters.js');
 const { TransactionUpdater } = await import('./transactionUpdater.js');
+const {
+  addExistingEntity,
+  incrementTransactionUpdates,
+  addAnonymousCpfRecord,
+  addFailedRecord,
+} = await import('./dryRunUtils.js');
+const { AnonymousPersonProcessor } = await import('./anonymousPersonProcessor.js');
 
 // Mock console methods
 const originalConsole = console;
@@ -115,6 +128,45 @@ describe('AnonymousPersonProcessor', () => {
       expect(processedEntities.get('123.***.*89-12')).toBe(true);
     });
 
+    test('should track existing anonymous person in dry run', async () => {
+      const transaction = {
+        id: 'transaction-dry-existing',
+        companyCnpj: '222.***.*33-44',
+        companyName: 'Dry Existing Anonymous',
+      };
+
+      const existingPerson = {
+        id: 'anonymous-person-dry',
+        fullName: 'Dry Existing Anonymous',
+        cpf: '222.***.*33-44',
+      };
+
+      const dryRunStats = { id: 'stats-existing' };
+
+      findByCpf.mockResolvedValue(existingPerson);
+
+      const result = await AnonymousPersonProcessor.process(
+        transaction,
+        processedEntities,
+        mockSession,
+        true,
+        dryRunStats
+      );
+
+      expect(addExistingEntity).toHaveBeenCalledWith(
+        dryRunStats,
+        '222.***.*33-44',
+        existingPerson,
+        'anonymous'
+      );
+      expect(incrementTransactionUpdates).toHaveBeenCalledWith(dryRunStats);
+      expect(
+        TransactionUpdater.updateWithAnonymousPersonId
+      ).not.toHaveBeenCalled();
+      expect(result).toEqual({ created: 0, skipped: 1, updated: 1 });
+      expect(processedEntities.get('222.***.*33-44')).toBe(true);
+    });
+
     test('should create new anonymous person when none exists', async () => {
       const transaction = {
         id: 'transaction456',
@@ -158,6 +210,47 @@ describe('AnonymousPersonProcessor', () => {
       expect(console.log).toHaveBeenCalledWith(
         '🆕 Created anonymous person: New Anonymous Person'
       );
+    });
+
+    test('should collect dry run stats when creating anonymous person', async () => {
+      const transaction = {
+        id: 'transaction-dry-new',
+        companyCnpj: '777.***.*88-99',
+        companyName: 'Dry New Anonymous',
+      };
+
+      const newPersonData = {
+        fullName: 'Dry New Anonymous',
+        cpf: '777.***.*88-99',
+        status: 'anonymous',
+      };
+
+      const dryRunStats = { id: 'stats-new' };
+
+      findByCpf.mockResolvedValue(null);
+      AnonymousPersonAdapter.fromTransaction.mockReturnValue(newPersonData);
+
+      const result = await AnonymousPersonProcessor.process(
+        transaction,
+        processedEntities,
+        mockSession,
+        true,
+        dryRunStats
+      );
+
+      expect(addAnonymousCpfRecord).toHaveBeenCalledWith(
+        dryRunStats,
+        '777.***.*88-99',
+        newPersonData,
+        transaction
+      );
+      expect(incrementTransactionUpdates).toHaveBeenCalledWith(dryRunStats);
+      expect(insertPerson).not.toHaveBeenCalled();
+      expect(
+        TransactionUpdater.updateWithAnonymousPersonId
+      ).not.toHaveBeenCalled();
+      expect(result).toEqual({ created: 1, skipped: 0, updated: 1 });
+      expect(processedEntities.get('777.***.*88-99')).toBe(true);
     });
 
     test('should handle case when AnonymousPersonAdapter returns null', async () => {
@@ -205,6 +298,33 @@ describe('AnonymousPersonProcessor', () => {
       expect(console.error).toHaveBeenCalledWith(
         '❌ Error processing anonymous person transaction:',
         'Database connection failed'
+      );
+    });
+
+    test('should track failed record in dry run', async () => {
+      const transaction = {
+        id: 'transaction-dry-error',
+        companyCnpj: '000.***.*00-00',
+        companyName: 'Dry Error Anonymous',
+      };
+
+      const dryRunStats = { id: 'stats-error' };
+      findByCpf.mockRejectedValue(new Error('Dry run failure'));
+
+      await expect(
+        AnonymousPersonProcessor.process(
+          transaction,
+          processedEntities,
+          mockSession,
+          true,
+          dryRunStats
+        )
+      ).rejects.toThrow('Dry run failure');
+
+      expect(addFailedRecord).toHaveBeenCalledWith(
+        dryRunStats,
+        transaction,
+        'Dry run failure'
       );
     });
 
