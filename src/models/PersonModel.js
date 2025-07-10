@@ -304,7 +304,6 @@ const PersonSchema = new mongoose.Schema(
 );
 
 // Índices para otimização de consultas (Indexes for query optimization)
-PersonSchema.index({ cpf: 1 });
 PersonSchema.index({ fullName: 1 });
 PersonSchema.index({ 'address.city': 1 });
 PersonSchema.index({ 'address.state': 1 });

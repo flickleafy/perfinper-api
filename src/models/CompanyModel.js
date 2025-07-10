@@ -273,8 +273,6 @@ const companySchema = mongoose.Schema({
 });
 
 // Indexes for better query performance
-companySchema.index({ companyCnpj: 1 });
-companySchema.index({ companyName: 1 });
 companySchema.index({ situacao: 1 });
 companySchema.index({ 'address.city': 1, 'address.state': 1 });
 
