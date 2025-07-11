@@ -26,10 +26,6 @@ const logger = createLogger({
       collection: 'logs_transactions',
       capped: true,
       cappedMax: 1000, // Increased from 20 to 1000 to allow for more log entries
-      options: {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-      },
     }),
   ],
   format: combine(

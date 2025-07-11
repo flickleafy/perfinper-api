@@ -81,10 +81,6 @@ describe('logger', () => {
         collection: 'logs_transactions',
         capped: true,
         cappedMax: 1000,
-        options: {
-          useNewUrlParser: true,
-          useUnifiedTopology: true,
-        },
       })
     );
 
