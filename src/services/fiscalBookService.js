@@ -1,5 +1,6 @@
 import * as fiscalBookRepository from '../repository/fiscalBookRepository.js';
 import * as transactionRepository from '../repository/transactionRepository.js';
+import * as snapshotSchedulerService from './snapshotSchedulerService.js';
 import mongoose from 'mongoose';
 import TransactionModel from '../models/TransactionModel.js';
 
@@ -124,6 +125,14 @@ export async function getFiscalBooksByCompany(companyId) {
  * @returns {Promise<Object>} Closed fiscal book
  */
 export async function closeFiscalBook(id) {
+  // Create before-status-change snapshot if configured
+  try {
+    await snapshotSchedulerService.createBeforeStatusChangeSnapshot(id, 'Fechado');
+  } catch (err) {
+    console.warn('Failed to create before-status-change snapshot:', err.message);
+    // Don't block the status change
+  }
+
   const closedBook = await fiscalBookRepository.closeBook(id);
   if (!closedBook) {
     throw new Error('Fiscal book not found');
@@ -137,6 +146,14 @@ export async function closeFiscalBook(id) {
  * @returns {Promise<Object>} Reopened fiscal book
  */
 export async function reopenFiscalBook(id) {
+  // Create before-status-change snapshot if configured
+  try {
+    await snapshotSchedulerService.createBeforeStatusChangeSnapshot(id, 'Aberto');
+  } catch (err) {
+    console.warn('Failed to create before-status-change snapshot:', err.message);
+    // Don't block the status change
+  }
+
   const reopenedBook = await fiscalBookRepository.reopenBook(id);
   if (!reopenedBook) {
     throw new Error('Fiscal book not found');

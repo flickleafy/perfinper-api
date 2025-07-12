@@ -11,6 +11,7 @@ import fiscalBookRoutes from './routes/fiscalBookRoutes.js';
 import snapshotRoutes from './routes/snapshotRoutes.js';
 import dotenv from 'dotenv';
 import { initializeDatabase } from './services/initializationService.js';
+import { initSnapshotCronJobs } from './cron/snapshotCron.js';
 import {
   // identifyAndUpdateCompanyFields,
   // migrateCompanyDataToCompanyCollection,
@@ -65,6 +66,10 @@ const initialize = async () => {
   // Initiate the connection
   await connectDB();
   await initializeDatabase();
+  
+  // Initialize cron jobs for scheduled snapshots
+  initSnapshotCronJobs();
+  
   // await identifyAndUpdateCompanyFields();
   // await migrateCompanyDataToCompanyCollection(false);
   // await migrateTransactionsToFiscalBooks();
