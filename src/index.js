@@ -8,6 +8,7 @@ import personRoutes from './routes/personRoutes.js';
 import importRoutes from './routes/importRoutes.js';
 import exportRoutes from './routes/exportRoutes.js';
 import fiscalBookRoutes from './routes/fiscalBookRoutes.js';
+import snapshotRoutes from './routes/snapshotRoutes.js';
 import dotenv from 'dotenv';
 import { initializeDatabase } from './services/initializationService.js';
 import {
@@ -37,6 +38,7 @@ app.use('/api/person', personRoutes);
 app.use('/api/import', importRoutes);
 app.use('/api/export', exportRoutes);
 app.use('/api/fiscal-book', fiscalBookRoutes);
+app.use('/api', snapshotRoutes); // Snapshot routes under /api
 
 /**
  * Database Connection Setup
