@@ -1,5 +1,50 @@
 # Changelog for Personal Finance Helper (perfinper-api)
 
+## 13 July 2025
+
+### Bug Fixes
+- Added `monetaryUtils.js` for consistent monetary value normalization and parsing
+- Updated `fiscalBookService.js` to compute totals with corrected precision
+- Updated `transactionPrototype.js` to normalize values on import
+- Fixed `fiscalBookRepository.js` to clear `closedAt` timestamp on reopen
+- Added `countByFiscalBook` to `transactionRepository.js` for efficient counting
+- Updated `transactionService.js` with improved transaction handling
+
+### Tests
+- Updated `fiscalBookRepository.test.js` to improve query coverage
+- Updated `snapshotRepository.test.js` to cover edge cases
+- Updated `snapshotRoutes.test.js` to verify API error handling
+- Updated `fiscalBookService.test.js` to test aggregation logic
+- Updated `transactionPrototype.test.js` to verify value normalization
+- Updated `snapshotSchedulerService.test.js` to test cron scheduling
+- Updated `snapshotService.test.js` to verify snapshot operations
+- Updated `transactionService.test.js` to improve transaction flow tests
+- Added `monetaryUtils.test.js` for monetary utility tests
+
+## 12 July 2025
+
+### Features
+- **Fiscal Book Snapshots Implementation**
+  - Added `FiscalBookSnapshotModel.js` for storing point-in-time fiscal book copies
+  - Added `SnapshotTransactionModel.js` for storing transaction copies within snapshots
+  - Added `SnapshotScheduleModel.js` for automatic snapshot scheduling configuration
+  - Added `snapshotRepository.js` with comprehensive CRUD operations
+  - Added `snapshotService.js` with business logic for create, compare, export, clone, rollback
+  - Added `snapshotSchedulerService.js` for automatic snapshot scheduling
+  - Added `snapshotRoutes.js` with REST API endpoints for all snapshot operations
+  - Registered snapshot routes in main Express app (`index.js`)
+
+### Bug Fixes
+- Added before-status-change triggers for fiscal book close/reopen operations
+- Added `snapshotCron.js` for scheduled automatic snapshot creation
+
+### Tests
+- Added `snapshotRepository.test.js` for repository layer tests
+- Added `snapshotRoutes.test.js` for API endpoint tests
+- Added `snapshotService.test.js` for service layer tests
+- Added `snapshotSchedulerService.test.js` for scheduler tests
+- Added tests for `cloneToNewFiscalBook` and `rollbackToSnapshot` operations
+
 ## 10 July 2025
 
 - Fixed mongodb warning about deprecated parameters
