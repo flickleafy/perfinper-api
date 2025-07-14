@@ -108,6 +108,24 @@ describe('snapshotSchedulerService', () => {
       );
     });
 
+    test('calculates next week when dayOfWeek is same as today', async () => {
+      snapshotRepository.getFiscalBook.mockResolvedValue({ _id: 'fb1' });
+      snapshotRepository.upsertSchedule.mockResolvedValue({});
+      const today = new Date().getDay();
+
+      await updateSchedule('fb1', {
+        enabled: true,
+        frequency: 'weekly',
+        dayOfWeek: today, // Same as today
+      });
+
+      const call = snapshotRepository.upsertSchedule.mock.calls[0][1];
+      const nextExecution = call.nextExecutionAt;
+      const todayDate = new Date();
+      // Should be 7 days from today
+      expect(nextExecution.getTime()).toBeGreaterThan(todayDate.getTime());
+    });
+
     test('calculates next execution for monthly schedule', async () => {
       snapshotRepository.getFiscalBook.mockResolvedValue({ _id: 'fb1' });
       snapshotRepository.upsertSchedule.mockResolvedValue({});
@@ -125,6 +143,38 @@ describe('snapshotSchedulerService', () => {
         })
       );
     });
+
+    test('uses default dayOfMonth 1 when not specified', async () => {
+      snapshotRepository.getFiscalBook.mockResolvedValue({ _id: 'fb1' });
+      snapshotRepository.upsertSchedule.mockResolvedValue({});
+
+      await updateSchedule('fb1', {
+        enabled: true,
+        frequency: 'monthly',
+        // no dayOfMonth specified
+      });
+
+      const call = snapshotRepository.upsertSchedule.mock.calls[0][1];
+      const nextExecution = call.nextExecutionAt;
+      expect(nextExecution.getDate()).toBe(1);
+    });
+
+    test('calculates null for before-status-change schedule', async () => {
+      snapshotRepository.getFiscalBook.mockResolvedValue({ _id: 'fb1' });
+      snapshotRepository.upsertSchedule.mockResolvedValue({});
+
+      await updateSchedule('fb1', {
+        enabled: true,
+        frequency: 'before-status-change',
+      });
+
+      expect(snapshotRepository.upsertSchedule).toHaveBeenCalledWith(
+        'fb1',
+        expect.objectContaining({
+          nextExecutionAt: null,
+        })
+      );
+    });
   });
 
   // ===== disableSchedule =====
@@ -136,6 +186,12 @@ describe('snapshotSchedulerService', () => {
 
       expect(snapshotRepository.upsertSchedule).toHaveBeenCalledWith('fb1', { enabled: false });
       expect(result.enabled).toBe(false);
+    });
+
+    test('throws on error', async () => {
+      snapshotRepository.upsertSchedule.mockRejectedValue(new Error('db error'));
+
+      await expect(disableSchedule('fb1')).rejects.toThrow('db error');
     });
   });
 
@@ -171,6 +227,32 @@ describe('snapshotSchedulerService', () => {
       expect(result.errors).toHaveLength(0);
     });
 
+    test('uses default auto tag when autoTags is undefined', async () => {
+      snapshotRepository.findDueSchedules.mockResolvedValue([
+        {
+          _id: 'sched1',
+          fiscalBookId: 'fb1',
+          frequency: 'weekly',
+          dayOfWeek: 1,
+          autoTags: undefined,
+          retentionCount: 5,
+        },
+      ]);
+      snapshotService.createFiscalBookSnapshot.mockResolvedValue({ _id: 'snap1' });
+      snapshotRepository.updateScheduleExecution.mockResolvedValue({});
+      snapshotRepository.findSnapshotsToCleanup.mockResolvedValue([]);
+
+      const result = await executeScheduledSnapshots();
+
+      expect(snapshotService.createFiscalBookSnapshot).toHaveBeenCalledWith(
+        'fb1',
+        expect.objectContaining({
+          tags: ['auto'],
+        })
+      );
+      expect(result.executed).toHaveLength(1);
+    });
+
     test('handles errors for individual schedules', async () => {
       snapshotRepository.findDueSchedules.mockResolvedValue([
         { _id: 'sched1', fiscalBookId: 'fb1', autoTags: [] },
@@ -191,6 +273,12 @@ describe('snapshotSchedulerService', () => {
 
       expect(result.executed).toHaveLength(0);
       expect(result.errors).toHaveLength(0);
+    });
+
+    test('throws when findDueSchedules fails', async () => {
+      snapshotRepository.findDueSchedules.mockRejectedValue(new Error('Database connection failed'));
+
+      await expect(executeScheduledSnapshots()).rejects.toThrow('Database connection failed');
     });
   });
 
@@ -225,6 +313,12 @@ describe('snapshotSchedulerService', () => {
 
       expect(snapshotRepository.findSnapshotsToCleanup).toHaveBeenCalledWith('fb1', 12);
     });
+
+    test('throws when findSnapshotsToCleanup fails', async () => {
+      snapshotRepository.findSnapshotsToCleanup.mockRejectedValue(new Error('Query failed'));
+
+      await expect(cleanupOldSnapshots('fb1')).rejects.toThrow('Query failed');
+    });
   });
 
   // ===== createBeforeStatusChangeSnapshot =====
@@ -248,6 +342,29 @@ describe('snapshotSchedulerService', () => {
         expect.objectContaining({
           creationSource: 'before-status-change',
           tags: expect.arrayContaining(['auto', 'status-change', 'before-status-change']),
+        })
+      );
+      expect(result).toEqual({ _id: 'snap1' });
+    });
+
+    test('uses default auto tag when autoTags is undefined', async () => {
+      snapshotRepository.getSchedule.mockResolvedValue({
+        _id: 'sched1',
+        enabled: true,
+        frequency: 'before-status-change',
+        autoTags: undefined,
+        retentionCount: 10,
+      });
+      snapshotService.createFiscalBookSnapshot.mockResolvedValue({ _id: 'snap1' });
+      snapshotRepository.updateScheduleExecution.mockResolvedValue({});
+      snapshotRepository.findSnapshotsToCleanup.mockResolvedValue([]);
+
+      const result = await createBeforeStatusChangeSnapshot('fb1', 'Fechado');
+
+      expect(snapshotService.createFiscalBookSnapshot).toHaveBeenCalledWith(
+        'fb1',
+        expect.objectContaining({
+          tags: expect.arrayContaining(['auto', 'before-status-change']),
         })
       );
       expect(result).toEqual({ _id: 'snap1' });

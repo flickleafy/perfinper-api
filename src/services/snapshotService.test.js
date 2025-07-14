@@ -21,10 +21,33 @@ const snapshotRepository = {
 
 const startSession = jest.fn();
 
+// Mocked models for dynamic imports
+const MockFiscalBookModel = function(data) {
+  return {
+    ...data,
+    _id: 'newfb1',
+    save: jest.fn().mockResolvedValue({ _id: 'newfb1', ...data }),
+  };
+};
+MockFiscalBookModel.findByIdAndUpdate = jest.fn().mockResolvedValue({});
+
+const MockTransactionModel = {
+  insertMany: jest.fn().mockResolvedValue([]),
+  deleteMany: jest.fn().mockResolvedValue({ deletedCount: 1 }),
+};
+
 jest.unstable_mockModule('../repository/snapshotRepository.js', () => snapshotRepository);
 
 jest.unstable_mockModule('mongoose', () => ({
   default: { startSession },
+}));
+
+jest.unstable_mockModule('../models/FiscalBookModel.js', () => ({
+  default: MockFiscalBookModel,
+}));
+
+jest.unstable_mockModule('../models/TransactionModel.js', () => ({
+  default: MockTransactionModel,
 }));
 
 const service = await import('./snapshotService.js');
@@ -151,6 +174,12 @@ describe('snapshotService', () => {
       expect(result.limit).toBe(50);
       expect(result.skip).toBe(0);
     });
+
+    test('throws on error', async () => {
+      snapshotRepository.findSnapshotsByFiscalBook.mockRejectedValue(new Error('db error'));
+
+      await expect(getSnapshotsForFiscalBook('fb1')).rejects.toThrow('db error');
+    });
   });
 
   // ===== getSnapshotDetails =====
@@ -162,6 +191,12 @@ describe('snapshotService', () => {
 
       expect(snapshotRepository.findSnapshotById).toHaveBeenCalledWith('snap1');
       expect(result).toEqual({ id: 'snap1' });
+    });
+
+    test('throws on error', async () => {
+      snapshotRepository.findSnapshotById.mockRejectedValue(new Error('db error'));
+
+      await expect(getSnapshotDetails('snap1')).rejects.toThrow('db error');
     });
   });
 
@@ -180,6 +215,12 @@ describe('snapshotService', () => {
         skip: 0,
       });
       expect(result.transactions).toEqual([]);
+    });
+
+    test('throws on error', async () => {
+      snapshotRepository.getSnapshotTransactions.mockRejectedValue(new Error('db error'));
+
+      await expect(getSnapshotTransactions('snap1')).rejects.toThrow('db error');
     });
   });
 
@@ -239,6 +280,12 @@ describe('snapshotService', () => {
       expect(snapshotRepository.deleteSnapshot).toHaveBeenCalledWith('snap1');
       expect(result).toEqual({ id: 'snap1' });
     });
+
+    test('throws on error', async () => {
+      snapshotRepository.deleteSnapshot.mockRejectedValue(new Error('db error'));
+
+      await expect(deleteSnapshot('snap1')).rejects.toThrow('db error');
+    });
   });
 
   // ===== deleteSnapshotsByFiscalBook =====
@@ -274,6 +321,12 @@ describe('snapshotService', () => {
       expect(snapshotRepository.updateSnapshotTags).toHaveBeenCalledWith('snap1', ['audit', 'test']);
       expect(result).toEqual({ id: 'snap1', tags: ['audit', 'test'] });
     });
+
+    test('throws on error', async () => {
+      snapshotRepository.updateSnapshotTags.mockRejectedValue(new Error('db error'));
+
+      await expect(updateTags('snap1', ['test'])).rejects.toThrow('db error');
+    });
   });
 
   // ===== toggleProtection =====
@@ -285,6 +338,12 @@ describe('snapshotService', () => {
 
       expect(snapshotRepository.setSnapshotProtection).toHaveBeenCalledWith('snap1', true);
       expect(result.isProtected).toBe(true);
+    });
+
+    test('throws on error', async () => {
+      snapshotRepository.setSnapshotProtection.mockRejectedValue(new Error('db error'));
+
+      await expect(toggleProtection('snap1', true)).rejects.toThrow('db error');
     });
   });
 
@@ -312,6 +371,12 @@ describe('snapshotService', () => {
         createdBy: 'system',
       });
     });
+
+    test('throws on error', async () => {
+      snapshotRepository.addSnapshotAnnotation.mockRejectedValue(new Error('db error'));
+
+      await expect(addAnnotation('snap1', 'Note')).rejects.toThrow('db error');
+    });
   });
 
   // ===== addTransactionAnnotation =====
@@ -326,6 +391,12 @@ describe('snapshotService', () => {
         createdBy: 'user1',
       });
       expect(result).toEqual({ id: 't1' });
+    });
+
+    test('throws on error', async () => {
+      snapshotRepository.addTransactionAnnotation.mockRejectedValue(new Error('db error'));
+
+      await expect(addTransactionAnnotation('t1', 'Note')).rejects.toThrow('db error');
     });
   });
 
@@ -403,6 +474,48 @@ describe('snapshotService', () => {
       await expect(service.cloneToNewFiscalBook('snap1')).rejects.toThrow('Snapshot not found.');
       expect(session.abortTransaction).toHaveBeenCalled();
     });
+
+    test('clones snapshot to new fiscal book with transactions', async () => {
+      snapshotRepository.findSnapshotById.mockResolvedValue({
+        _id: 'snap1',
+        snapshotName: 'Original Book',
+        fiscalBookData: {
+          bookName: 'Test Book',
+          bookType: 'Entrada',
+          bookPeriod: '2024',
+          reference: 'REF001',
+          status: 'Fechado',
+          fiscalData: {},
+          companyId: 'comp1',
+          notes: 'Notes',
+        },
+      });
+      snapshotRepository.getSnapshotTransactions.mockResolvedValue({
+        transactions: [
+          { transactionData: { transactionName: 'TX1', transactionValue: 100 } },
+          { transactionData: { transactionName: 'TX2', transactionValue: 200 } },
+        ],
+      });
+
+      const result = await service.cloneToNewFiscalBook('snap1', { bookName: 'Cloned Book' });
+
+      expect(result._id).toBe('newfb1');
+      expect(result.bookName).toBe('Cloned Book');
+      expect(session.commitTransaction).toHaveBeenCalled();
+    });
+
+    test('clones snapshot without transactions', async () => {
+      snapshotRepository.findSnapshotById.mockResolvedValue({
+        _id: 'snap1',
+        fiscalBookData: { bookName: 'Test', bookType: 'Entrada' },
+      });
+      snapshotRepository.getSnapshotTransactions.mockResolvedValue({ transactions: [] });
+
+      const result = await service.cloneToNewFiscalBook('snap1');
+
+      expect(result.bookName).toBe('Test (Cópia)');
+      expect(session.commitTransaction).toHaveBeenCalled();
+    });
   });
 
   // ===== rollbackToSnapshot =====
@@ -413,6 +526,89 @@ describe('snapshotService', () => {
 
       await expect(service.rollbackToSnapshot('snap1')).rejects.toThrow('Snapshot not found.');
       expect(session.abortTransaction).toHaveBeenCalled();
+    });
+
+    test('throws when original fiscal book not found', async () => {
+      snapshotRepository.findSnapshotById.mockResolvedValue({
+        _id: 'snap1',
+        originalFiscalBookId: 'fb1',
+        snapshotName: 'Test',
+      });
+      snapshotRepository.getFiscalBook.mockResolvedValue(null);
+
+      await expect(service.rollbackToSnapshot('snap1')).rejects.toThrow('Original fiscal book not found.');
+      expect(session.abortTransaction).toHaveBeenCalled();
+    });
+
+    test('rolls back to snapshot without pre-rollback snapshot', async () => {
+      snapshotRepository.findSnapshotById.mockResolvedValue({
+        _id: 'snap1',
+        originalFiscalBookId: 'fb1',
+        snapshotName: 'Test Snapshot',
+        fiscalBookData: {
+          bookName: 'Original Book',
+          bookType: 'Entrada',
+          reference: 'REF',
+          status: 'Fechado',
+          fiscalData: {},
+          notes: 'Notes',
+        },
+      });
+      snapshotRepository.getFiscalBook.mockResolvedValue({ _id: 'fb1' });
+      snapshotRepository.getSnapshotTransactions.mockResolvedValue({
+        transactions: [
+          { transactionData: { transactionName: 'TX1' } },
+        ],
+      });
+
+      const result = await service.rollbackToSnapshot('snap1', { createPreRollbackSnapshot: false });
+
+      expect(result.success).toBe(true);
+      expect(result.fiscalBookId).toBe('fb1');
+      expect(result.restoredFromSnapshot).toBe('snap1');
+      expect(result.restoredTransactionCount).toBe(1);
+      expect(session.commitTransaction).toHaveBeenCalled();
+    });
+
+    test('rolls back to snapshot without transactions', async () => {
+      snapshotRepository.findSnapshotById.mockResolvedValue({
+        _id: 'snap1',
+        originalFiscalBookId: 'fb1',
+        snapshotName: 'Empty Snapshot',
+        fiscalBookData: { bookName: 'Book', bookType: 'Entrada' },
+      });
+      snapshotRepository.getFiscalBook.mockResolvedValue({ _id: 'fb1' });
+      snapshotRepository.getSnapshotTransactions.mockResolvedValue({ transactions: [] });
+
+      const result = await service.rollbackToSnapshot('snap1', { createPreRollbackSnapshot: false });
+
+      expect(result.success).toBe(true);
+      expect(result.restoredTransactionCount).toBe(0);
+    });
+
+    test('rolls back to snapshot with pre-rollback snapshot creation', async () => {
+      // Mock for the snapshot being rolled back to
+      snapshotRepository.findSnapshotById.mockResolvedValue({
+        _id: 'snap1',
+        originalFiscalBookId: 'fb1',
+        snapshotName: 'Target Snapshot',
+        fiscalBookData: { bookName: 'Book', bookType: 'Entrada', status: 'Fechado' },
+      });
+      snapshotRepository.getFiscalBook.mockResolvedValue({
+        _id: 'fb1',
+        bookName: 'Current Book',
+        bookType: 'Entrada',
+        status: 'Aberto',
+      });
+      // For createFiscalBookSnapshot
+      snapshotRepository.getCurrentTransactions.mockResolvedValue([]);
+      snapshotRepository.createSnapshot.mockResolvedValue({ _id: 'prerollback-snap' });
+      snapshotRepository.getSnapshotTransactions.mockResolvedValue({ transactions: [] });
+
+      const result = await service.rollbackToSnapshot('snap1', { createPreRollbackSnapshot: true });
+
+      expect(result.success).toBe(true);
+      expect(result.preRollbackSnapshotId).toBe('prerollback-snap');
     });
   });
 
@@ -458,6 +654,35 @@ describe('snapshotService', () => {
       const result = await compareSnapshotWithCurrent('snap1');
 
       expect(result.counts.added).toBe(1);
+    });
+
+    test('detects unchanged transactions', async () => {
+      snapshotRepository.findSnapshotById.mockResolvedValue({
+        _id: 'snap1',
+        snapshotName: 'Test',
+        originalFiscalBookId: 'fb1',
+        statistics: { transactionCount: 1, totalIncome: 100, totalExpenses: 0, netAmount: 100 },
+      });
+      snapshotRepository.getSnapshotTransactions.mockResolvedValue({
+        transactions: [{
+          originalTransactionId: 't1',
+          transactionData: { transactionName: 'Same Name', transactionValue: '100' },
+        }],
+      });
+      snapshotRepository.getCurrentTransactions.mockResolvedValue([
+        { _id: 't1', transactionName: 'Same Name', transactionValue: '100' },
+      ]);
+
+      const result = await compareSnapshotWithCurrent('snap1');
+
+      expect(result.counts.unchanged).toBe(1);
+      expect(result.counts.modified).toBe(0);
+    });
+
+    test('throws on error', async () => {
+      snapshotRepository.findSnapshotById.mockRejectedValue(new Error('db error'));
+
+      await expect(compareSnapshotWithCurrent('snap1')).rejects.toThrow('db error');
     });
   });
 });

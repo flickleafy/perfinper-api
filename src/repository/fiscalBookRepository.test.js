@@ -19,6 +19,7 @@ jest.unstable_mockModule('../models/FiscalBookModel.js', () => ({
 const repository = await import('./fiscalBookRepository.js');
 const {
   findAll,
+  findAllWithStats,
   findById,
   findByType,
   findByPeriod,
@@ -86,6 +87,68 @@ describe('fiscalBookRepository', () => {
 
     await expect(findAll()).rejects.toThrow(
       'Failed to retrieve all fiscal books.'
+    );
+  });
+
+  // ===== findAllWithStats =====
+  test('findAllWithStats returns aggregated results', async () => {
+    FiscalBookModel.aggregate.mockResolvedValue([{ id: '1', transactionCount: 5 }]);
+
+    const result = await findAllWithStats({ status: 'Aberto' });
+
+    expect(FiscalBookModel.aggregate).toHaveBeenCalled();
+    const pipeline = FiscalBookModel.aggregate.mock.calls[0][0];
+    expect(pipeline[0]).toEqual({ $match: { status: 'Aberto' } });
+    expect(result).toEqual([{ id: '1', transactionCount: 5 }]);
+  });
+
+  test('findAllWithStats handles string sort format descending', async () => {
+    FiscalBookModel.aggregate.mockResolvedValue([]);
+
+    await findAllWithStats({}, { sort: '-createdAt' });
+
+    const pipeline = FiscalBookModel.aggregate.mock.calls[0][0];
+    const sortStage = pipeline.find(stage => stage.$sort);
+    expect(sortStage.$sort).toEqual({ createdAt: -1 });
+  });
+
+  test('findAllWithStats handles string sort format ascending', async () => {
+    FiscalBookModel.aggregate.mockResolvedValue([]);
+
+    await findAllWithStats({}, { sort: 'bookName' });
+
+    const pipeline = FiscalBookModel.aggregate.mock.calls[0][0];
+    const sortStage = pipeline.find(stage => stage.$sort);
+    expect(sortStage.$sort).toEqual({ bookName: 1 });
+  });
+
+  test('findAllWithStats handles object sort format', async () => {
+    FiscalBookModel.aggregate.mockResolvedValue([]);
+
+    await findAllWithStats({}, { sort: { updatedAt: -1 } });
+
+    const pipeline = FiscalBookModel.aggregate.mock.calls[0][0];
+    const sortStage = pipeline.find(stage => stage.$sort);
+    expect(sortStage.$sort).toEqual({ updatedAt: -1 });
+  });
+
+  test('findAllWithStats applies skip and limit', async () => {
+    FiscalBookModel.aggregate.mockResolvedValue([]);
+
+    await findAllWithStats({}, { skip: 10, limit: 5 });
+
+    const pipeline = FiscalBookModel.aggregate.mock.calls[0][0];
+    const skipStage = pipeline.find(stage => stage.$skip);
+    const limitStage = pipeline.find(stage => stage.$limit);
+    expect(skipStage.$skip).toBe(10);
+    expect(limitStage.$limit).toBe(5);
+  });
+
+  test('findAllWithStats throws on error', async () => {
+    FiscalBookModel.aggregate.mockRejectedValue(new Error('db'));
+
+    await expect(findAllWithStats()).rejects.toThrow(
+      'Failed to retrieve fiscal books with statistics.'
     );
   });
 
