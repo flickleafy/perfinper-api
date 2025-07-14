@@ -1,4 +1,5 @@
 import { paymentMethodAdapter } from './paymenthMethodAdapter.js';
+import { normalizeMonetaryValue } from '../../infrastructure/monetary/monetaryUtils.js';
 
 export function transactionPrototype(body) {
   body = JSON.parse(JSON.stringify(body));
@@ -30,11 +31,16 @@ export function transactionPrototype(body) {
     fiscalBookId,
   } = body;
 
+  // Normalize monetary values to comma format
+  const rawValue = transactionValue || totalValue;
+  const normalizedTransactionValue = rawValue ? normalizeMonetaryValue(rawValue) : undefined;
+  const normalizedFreightValue = freightValue ? normalizeMonetaryValue(freightValue) : undefined;
+
   return {
     transactionDate,
     transactionPeriod,
     transactionSource,
-    transactionValue: transactionValue ? transactionValue : totalValue,
+    transactionValue: normalizedTransactionValue,
     transactionName: transactionName ? transactionName : itemName,
     transactionInstallments,
     installments,
@@ -47,7 +53,7 @@ export function transactionPrototype(body) {
     transactionLocation: transactionLocation || 'other',
     transactionType,
     transactionCategory,
-    freightValue,
+    freightValue: normalizedFreightValue,
     paymentMethod: paymentMethod || paymentMethodAdapter(body),
     items,
     companyName,
@@ -57,3 +63,4 @@ export function transactionPrototype(body) {
     fiscalBookId,
   };
 }
+

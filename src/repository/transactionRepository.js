@@ -354,6 +354,20 @@ export async function findByFiscalBookId(fiscalBookId, session = null) {
 }
 
 /**
+ * Count transactions by fiscal book ID
+ * @param {string} fiscalBookId - Fiscal book ID to count for
+ * @returns {Promise<number>} Count of transactions
+ */
+export async function countByFiscalBook(fiscalBookId) {
+  try {
+    return await TransactionModel.countDocuments({ fiscalBookId });
+  } catch (error) {
+    console.error('Error in countByFiscalBook:', error.message);
+    return 0; // Return 0 on error to avoid breaking the list
+  }
+}
+
+/**
  * Update fiscal book ID for multiple transactions
  * @param {Array<string>} transactionIds - Array of transaction IDs
  * @param {string} fiscalBookId - Fiscal book ID to assign
