@@ -64,6 +64,7 @@ const {
   findSnapshotById,
   getSnapshotTransactions,
   deleteSnapshot,
+  deleteSnapshotsByFiscalBook,
   updateSnapshotTags,
   setSnapshotProtection,
   addSnapshotAnnotation,
@@ -225,6 +226,17 @@ describe('snapshotRepository', () => {
 
       await expect(countSnapshotsByFiscalBook('fb1')).rejects.toThrow('Failed to count snapshots for fiscal book.');
     });
+
+    test('supports session', async () => {
+      const query = makeExecQuery(3);
+      FiscalBookSnapshotModel.countDocuments.mockReturnValue(query);
+      const session = { id: 's' };
+
+      const result = await countSnapshotsByFiscalBook('fb1', session);
+
+      expect(query.session).toHaveBeenCalledWith(session);
+      expect(result).toBe(3);
+    });
   });
 
   // ===== findSnapshotById =====
@@ -289,6 +301,20 @@ describe('snapshotRepository', () => {
 
       await expect(getSnapshotTransactions('snap1')).rejects.toThrow('Failed to retrieve snapshot transactions.');
     });
+
+    test('supports session', async () => {
+      const query = makeQuery([{ id: 't1' }]);
+      SnapshotTransactionModel.find.mockReturnValue(query);
+      const countQuery = { session: jest.fn().mockResolvedValue(1) };
+      SnapshotTransactionModel.countDocuments.mockReturnValue(countQuery);
+      const session = { id: 's' };
+
+      const result = await getSnapshotTransactions('snap1', {}, session);
+
+      expect(query.session).toHaveBeenCalledWith(session);
+      expect(countQuery.session).toHaveBeenCalledWith(session);
+      expect(result.transactions).toEqual([{ id: 't1' }]);
+    });
   });
 
   // ===== deleteSnapshot =====
@@ -317,6 +343,73 @@ describe('snapshotRepository', () => {
       FiscalBookSnapshotModel.findById.mockResolvedValue({ _id: 'snap1', isProtected: true });
 
       await expect(deleteSnapshot('snap1')).rejects.toThrow('Cannot delete a protected snapshot');
+    });
+
+    test('supports session', async () => {
+      const sessionQuery = { session: jest.fn().mockResolvedValue({ _id: 'snap1', isProtected: false }) };
+      FiscalBookSnapshotModel.findById.mockReturnValue(sessionQuery);
+      SnapshotTransactionModel.deleteMany.mockResolvedValue({ deletedCount: 2 });
+      FiscalBookSnapshotModel.findByIdAndDelete.mockResolvedValue({ id: 'snap1' });
+      const session = { id: 's' };
+
+      const result = await deleteSnapshot('snap1', session);
+
+      expect(sessionQuery.session).toHaveBeenCalledWith(session);
+      expect(SnapshotTransactionModel.deleteMany).toHaveBeenCalledWith({ snapshotId: 'snap1' }, { session });
+      expect(FiscalBookSnapshotModel.findByIdAndDelete).toHaveBeenCalledWith('snap1', { session });
+      expect(result).toEqual({ id: 'snap1' });
+    });
+  });
+
+  // ===== deleteSnapshotsByFiscalBook =====
+  describe('deleteSnapshotsByFiscalBook', () => {
+    test('deletes all snapshots and their transactions for a fiscal book', async () => {
+      const snapshotsQuery = makeQuery([{ _id: 'snap1' }, { _id: 'snap2' }]);
+      FiscalBookSnapshotModel.find.mockReturnValue(snapshotsQuery);
+      SnapshotTransactionModel.deleteMany.mockResolvedValue({ deletedCount: 10 });
+      FiscalBookSnapshotModel.deleteMany.mockResolvedValue({ deletedCount: 2 });
+
+      const result = await deleteSnapshotsByFiscalBook('fb1');
+
+      expect(FiscalBookSnapshotModel.find).toHaveBeenCalledWith({ originalFiscalBookId: 'fb1' });
+      expect(SnapshotTransactionModel.deleteMany).toHaveBeenCalledWith(
+        { snapshotId: { $in: ['snap1', 'snap2'] } },
+        {}
+      );
+      expect(FiscalBookSnapshotModel.deleteMany).toHaveBeenCalledWith(
+        { originalFiscalBookId: 'fb1' },
+        {}
+      );
+      expect(result.deletedCount).toBe(2);
+    });
+
+    test('supports session', async () => {
+      const snapshotsQuery = makeQuery([{ _id: 'snap1' }]);
+      FiscalBookSnapshotModel.find.mockReturnValue(snapshotsQuery);
+      SnapshotTransactionModel.deleteMany.mockResolvedValue({ deletedCount: 5 });
+      FiscalBookSnapshotModel.deleteMany.mockResolvedValue({ deletedCount: 1 });
+      const session = { id: 's' };
+
+      const result = await deleteSnapshotsByFiscalBook('fb1', session);
+
+      expect(snapshotsQuery.session).toHaveBeenCalledWith(session);
+      expect(SnapshotTransactionModel.deleteMany).toHaveBeenCalledWith(
+        { snapshotId: { $in: ['snap1'] } },
+        { session }
+      );
+      expect(FiscalBookSnapshotModel.deleteMany).toHaveBeenCalledWith(
+        { originalFiscalBookId: 'fb1' },
+        { session }
+      );
+      expect(result.deletedCount).toBe(1);
+    });
+
+    test('throws on error', async () => {
+      FiscalBookSnapshotModel.find.mockImplementation(() => {
+        throw new Error('db');
+      });
+
+      await expect(deleteSnapshotsByFiscalBook('fb1')).rejects.toThrow('Failed to delete snapshots for fiscal book.');
     });
   });
 
@@ -348,6 +441,20 @@ describe('snapshotRepository', () => {
 
       await expect(updateSnapshotTags('snap1', [])).rejects.toThrow('Failed to update snapshot tags.');
     });
+
+    test('supports session', async () => {
+      FiscalBookSnapshotModel.findByIdAndUpdate.mockResolvedValue({ id: 'snap1', tags: ['tag'] });
+      const session = { id: 's' };
+
+      const result = await updateSnapshotTags('snap1', ['tag'], session);
+
+      expect(FiscalBookSnapshotModel.findByIdAndUpdate).toHaveBeenCalledWith(
+        'snap1',
+        { tags: ['tag'] },
+        { new: true, session }
+      );
+      expect(result).toEqual({ id: 'snap1', tags: ['tag'] });
+    });
   });
 
   // ===== setSnapshotProtection =====
@@ -369,6 +476,20 @@ describe('snapshotRepository', () => {
       FiscalBookSnapshotModel.findByIdAndUpdate.mockRejectedValue(new Error('db'));
 
       await expect(setSnapshotProtection('snap1', false)).rejects.toThrow('Failed to update snapshot protection status.');
+    });
+
+    test('supports session', async () => {
+      FiscalBookSnapshotModel.findByIdAndUpdate.mockResolvedValue({ id: 'snap1', isProtected: true });
+      const session = { id: 's' };
+
+      const result = await setSnapshotProtection('snap1', true, session);
+
+      expect(FiscalBookSnapshotModel.findByIdAndUpdate).toHaveBeenCalledWith(
+        'snap1',
+        { isProtected: true },
+        { new: true, session }
+      );
+      expect(result).toEqual({ id: 'snap1', isProtected: true });
     });
   });
 
@@ -399,6 +520,20 @@ describe('snapshotRepository', () => {
 
       await expect(addSnapshotAnnotation('snap1', {})).rejects.toThrow('Failed to add annotation to snapshot.');
     });
+
+    test('supports session', async () => {
+      FiscalBookSnapshotModel.findByIdAndUpdate.mockResolvedValue({ id: 'snap1' });
+      const session = { id: 's' };
+
+      const result = await addSnapshotAnnotation('snap1', { content: 'note', createdBy: 'user' }, session);
+
+      expect(FiscalBookSnapshotModel.findByIdAndUpdate).toHaveBeenCalledWith(
+        'snap1',
+        { $push: { annotations: expect.any(Object) } },
+        { new: true, session }
+      );
+      expect(result).toEqual({ id: 'snap1' });
+    });
   });
 
   // ===== addTransactionAnnotation =====
@@ -416,6 +551,20 @@ describe('snapshotRepository', () => {
       SnapshotTransactionModel.findByIdAndUpdate.mockRejectedValue(new Error('db'));
 
       await expect(addTransactionAnnotation('t1', {})).rejects.toThrow('Failed to add annotation to snapshot transaction.');
+    });
+
+    test('supports session', async () => {
+      SnapshotTransactionModel.findByIdAndUpdate.mockResolvedValue({ id: 't1' });
+      const session = { id: 's' };
+
+      const result = await addTransactionAnnotation('t1', { content: 'note', createdBy: 'user' }, session);
+
+      expect(SnapshotTransactionModel.findByIdAndUpdate).toHaveBeenCalledWith(
+        't1',
+        { $push: { annotations: expect.any(Object) } },
+        { new: true, session }
+      );
+      expect(result).toEqual({ id: 't1' });
     });
   });
 
@@ -437,6 +586,17 @@ describe('snapshotRepository', () => {
       });
 
       await expect(getCurrentTransactions('fb1')).rejects.toThrow('Failed to retrieve current transactions.');
+    });
+
+    test('supports session', async () => {
+      const query = makeExecQuery([{ id: 't1' }]);
+      TransactionModel.find.mockReturnValue(query);
+      const session = { id: 's' };
+
+      const result = await getCurrentTransactions('fb1', session);
+
+      expect(query.session).toHaveBeenCalledWith(session);
+      expect(result).toEqual([{ id: 't1' }]);
     });
   });
 
@@ -464,6 +624,17 @@ describe('snapshotRepository', () => {
 
       await expect(getFiscalBook('fb1')).rejects.toThrow('An error occurred while finding the fiscal book.');
     });
+
+    test('supports session', async () => {
+      const sessionQuery = { session: jest.fn().mockResolvedValue({ id: 'fb1' }) };
+      FiscalBookModel.findById.mockReturnValue(sessionQuery);
+      const session = { id: 's' };
+
+      const result = await getFiscalBook('fb1', session);
+
+      expect(sessionQuery.session).toHaveBeenCalledWith(session);
+      expect(result).toEqual({ id: 'fb1' });
+    });
   });
 
   // ===== getSchedule =====
@@ -484,6 +655,17 @@ describe('snapshotRepository', () => {
       });
 
       await expect(getSchedule('fb1')).rejects.toThrow('Failed to retrieve snapshot schedule.');
+    });
+
+    test('supports session', async () => {
+      const query = makeExecQuery({ fiscalBookId: 'fb1' });
+      SnapshotScheduleModel.findOne.mockReturnValue(query);
+      const session = { id: 's' };
+
+      const result = await getSchedule('fb1', session);
+
+      expect(query.session).toHaveBeenCalledWith(session);
+      expect(result).toEqual({ fiscalBookId: 'fb1' });
     });
   });
 
@@ -506,6 +688,20 @@ describe('snapshotRepository', () => {
       SnapshotScheduleModel.findOneAndUpdate.mockRejectedValue(new Error('db'));
 
       await expect(upsertSchedule('fb1', {})).rejects.toThrow('Failed to update snapshot schedule.');
+    });
+
+    test('supports session', async () => {
+      SnapshotScheduleModel.findOneAndUpdate.mockResolvedValue({ fiscalBookId: 'fb1' });
+      const session = { id: 's' };
+
+      const result = await upsertSchedule('fb1', { enabled: true }, session);
+
+      expect(SnapshotScheduleModel.findOneAndUpdate).toHaveBeenCalledWith(
+        { fiscalBookId: 'fb1' },
+        { enabled: true, fiscalBookId: 'fb1' },
+        { new: true, upsert: true, session }
+      );
+      expect(result).toEqual({ fiscalBookId: 'fb1' });
     });
   });
 
@@ -533,6 +729,19 @@ describe('snapshotRepository', () => {
 
       await expect(deleteSchedule('fb1')).rejects.toThrow('Failed to delete snapshot schedule.');
     });
+
+    test('supports session', async () => {
+      SnapshotScheduleModel.findOneAndDelete.mockResolvedValue({ fiscalBookId: 'fb1' });
+      const session = { id: 's' };
+
+      const result = await deleteSchedule('fb1', session);
+
+      expect(SnapshotScheduleModel.findOneAndDelete).toHaveBeenCalledWith(
+        { fiscalBookId: 'fb1' },
+        { session }
+      );
+      expect(result).toEqual({ fiscalBookId: 'fb1' });
+    });
   });
 
   // ===== findDueSchedules =====
@@ -558,6 +767,18 @@ describe('snapshotRepository', () => {
 
       await expect(findDueSchedules(new Date())).rejects.toThrow('Failed to find due schedules.');
     });
+
+    test('supports session', async () => {
+      const query = makeExecQuery([{ fiscalBookId: 'fb1' }]);
+      SnapshotScheduleModel.find.mockReturnValue(query);
+      const session = { id: 's' };
+      const date = new Date();
+
+      const result = await findDueSchedules(date, session);
+
+      expect(query.session).toHaveBeenCalledWith(session);
+      expect(result).toEqual([{ fiscalBookId: 'fb1' }]);
+    });
   });
 
   // ===== updateScheduleExecution =====
@@ -581,6 +802,22 @@ describe('snapshotRepository', () => {
       SnapshotScheduleModel.findByIdAndUpdate.mockRejectedValue(new Error('db'));
 
       await expect(updateScheduleExecution('sched1', new Date(), new Date())).rejects.toThrow('Failed to update schedule execution.');
+    });
+
+    test('supports session', async () => {
+      SnapshotScheduleModel.findByIdAndUpdate.mockResolvedValue({ id: 'sched1' });
+      const session = { id: 's' };
+      const lastExecuted = new Date();
+      const nextExecution = new Date();
+
+      const result = await updateScheduleExecution('sched1', lastExecuted, nextExecution, session);
+
+      expect(SnapshotScheduleModel.findByIdAndUpdate).toHaveBeenCalledWith(
+        'sched1',
+        { lastExecutedAt: lastExecuted, nextExecutionAt: nextExecution },
+        { new: true, session }
+      );
+      expect(result).toEqual({ id: 'sched1' });
     });
   });
 
@@ -607,6 +844,17 @@ describe('snapshotRepository', () => {
       });
 
       await expect(findSnapshotsToCleanup('fb1', 5)).rejects.toThrow('Failed to find snapshots for cleanup.');
+    });
+
+    test('supports session', async () => {
+      const query = makeQuery([{ _id: 'snap1' }]);
+      FiscalBookSnapshotModel.find.mockReturnValue(query);
+      const session = { id: 's' };
+
+      const result = await findSnapshotsToCleanup('fb1', 5, session);
+
+      expect(query.session).toHaveBeenCalledWith(session);
+      expect(result).toEqual(['snap1']);
     });
   });
 });

@@ -45,6 +45,26 @@ describe('transactionPrototype', () => {
     expect(result.transactionDescription).toBe('Meal');
     expect(result.transactionLocation).toBe('online');
     expect(result.paymentMethod).toBe('money');
+    expect(result.paymentMethod).toBe('money');
     expect(paymentMethodAdapter).not.toHaveBeenCalled();
+  });
+
+  test('handles freightValue and normalizes it', () => {
+    const result = transactionPrototype({
+      transactionValue: '100,00',
+      freightValue: '15,50',
+    });
+
+    expect(result.transactionValue).toBe('100,00');
+    expect(result.freightValue).toBe('15,50');
+  });
+
+  test('handles missing transactionValue and totalValue (undefined values)', () => {
+    const result = transactionPrototype({
+      transactionName: 'Free Item',
+    });
+
+    expect(result.transactionValue).toBeUndefined();
+    expect(result.freightValue).toBeUndefined();
   });
 });

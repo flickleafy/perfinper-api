@@ -19,6 +19,7 @@ const fiscalBookRepository = {
 const transactionRepository = {
   findById: jest.fn(),
   updateById: jest.fn(),
+  findByFiscalBookId: jest.fn(),
 };
 
 const validator = {
@@ -42,8 +43,29 @@ jest.unstable_mockModule('../infrastructure/validators/fiscalBookValidator.js', 
   default: validator,
 }));
 
-jest.unstable_mockModule('mongoose', () => ({
-  default: { startSession },
+jest.unstable_mockModule('mongoose', () => {
+  const SchemaConstructor = function() {
+    return {
+      index: jest.fn(),
+      set: jest.fn(),
+      pre: jest.fn(),
+    };
+  };
+  SchemaConstructor.Types = {
+    ObjectId: String,
+  };
+  
+  return {
+    default: { 
+      startSession,
+      Schema: SchemaConstructor,
+      model: jest.fn(() => ({})),
+    },
+  };
+});
+
+jest.unstable_mockModule('./snapshotSchedulerService.js', () => ({
+  createBeforeStatusChangeSnapshot: jest.fn(),
 }));
 
 jest.unstable_mockModule('../models/TransactionModel.js', () => ({
@@ -117,6 +139,7 @@ describe('fiscalBookService', () => {
 
   test('getAllFiscalBooks passes filter and options', async () => {
     fiscalBookRepository.findAll.mockResolvedValue([{ id: 'fb1' }]);
+    transactionRepository.findByFiscalBookId.mockResolvedValue([]);
 
     const result = await getAllFiscalBooks({ status: 'open' }, { limit: 1 });
 
@@ -124,7 +147,13 @@ describe('fiscalBookService', () => {
       { status: 'open' },
       { limit: 1 }
     );
-    expect(result).toEqual([{ id: 'fb1' }]);
+    expect(result).toEqual([{
+      id: 'fb1',
+      transactionCount: 0,
+      totalIncome: 0,
+      totalExpenses: 0,
+      netAmount: 0,
+    }]);
   });
 
   test('getFiscalBookById returns book', async () => {
@@ -223,10 +252,59 @@ describe('fiscalBookService', () => {
     await expect(reopenFiscalBook('fb1')).rejects.toThrow('Fiscal book not found');
   });
 
+  test('closeFiscalBook continues when snapshot creation fails', async () => {
+    const snapshotSchedulerService = await import('./snapshotSchedulerService.js');
+    snapshotSchedulerService.createBeforeStatusChangeSnapshot.mockRejectedValueOnce(new Error('Snapshot failed'));
+    fiscalBookRepository.closeBook.mockResolvedValue({ id: 'fb1', status: 'Fechado' });
+
+    const result = await closeFiscalBook('fb1');
+
+    expect(result).toEqual({ id: 'fb1', status: 'Fechado' });
+  });
+
+  test('reopenFiscalBook continues when snapshot creation fails', async () => {
+    const snapshotSchedulerService = await import('./snapshotSchedulerService.js');
+    snapshotSchedulerService.createBeforeStatusChangeSnapshot.mockRejectedValueOnce(new Error('Snapshot failed'));
+    fiscalBookRepository.reopenBook.mockResolvedValue({ id: 'fb1', status: 'Aberto' });
+
+    const result = await reopenFiscalBook('fb1');
+
+    expect(result).toEqual({ id: 'fb1', status: 'Aberto' });
+  });
+
   test('getFiscalBookStatistics returns stats', async () => {
     fiscalBookRepository.getStatistics.mockResolvedValue({ total: 2 });
 
     await expect(getFiscalBookStatistics()).resolves.toEqual({ total: 2 });
+  });
+
+  test('getAllFiscalBooks computes financial summary with credit and debit transactions', async () => {
+    fiscalBookRepository.findAll.mockResolvedValue([{ _id: 'fb1', toObject: () => ({ id: 'fb1' }) }]);
+    transactionRepository.findByFiscalBookId.mockResolvedValue([
+      { transactionValue: '100,50', transactionType: 'credit' },
+      { transactionValue: '50.25', transactionType: 'debit' },
+      { transactionValue: '-25', transactionType: 'debit' },
+    ]);
+
+    const result = await getAllFiscalBooks();
+
+    expect(result[0].transactionCount).toBe(3);
+    expect(result[0].totalIncome).toBeCloseTo(100.50);
+    expect(result[0].totalExpenses).toBeCloseTo(75.25);
+    expect(result[0].netAmount).toBeCloseTo(25.25);
+  });
+
+  test('getAllFiscalBooks handles null transaction values', async () => {
+    fiscalBookRepository.findAll.mockResolvedValue([{ id: 'fb1' }]);
+    transactionRepository.findByFiscalBookId.mockResolvedValue([
+      { transactionValue: null, transactionType: 'credit' },
+      { transactionType: 'debit' },
+    ]);
+
+    const result = await getAllFiscalBooks();
+
+    expect(result[0].totalIncome).toBe(0);
+    expect(result[0].totalExpenses).toBe(0);
   });
 
   test('getFiscalBookTransactions returns transactions', async () => {
