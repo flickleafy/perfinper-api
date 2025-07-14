@@ -28,6 +28,127 @@ export async function findAll(filter = {}, options = {}, session = null) {
 }
 
 /**
+ * Find all fiscal books with computed transaction statistics
+ * Uses MongoDB aggregation to compute transactionCount, totalIncome, totalExpenses, netAmount
+ * @param {Object} filter - MongoDB filter object
+ * @param {Object} options - Query options (limit, skip, sort)
+ * @returns {Promise<Array>} Array of fiscal book documents with statistics
+ */
+export async function findAllWithStats(filter = {}, options = {}) {
+  try {
+    const pipeline = [
+      // Match filter criteria
+      { $match: filter },
+      // Join with transactions collection
+      {
+        $lookup: {
+          from: 'transactions',
+          localField: '_id',
+          foreignField: 'fiscalBookId',
+          as: 'transactionsList',
+        },
+      },
+      // Add computed fields
+      {
+        $addFields: {
+          transactionCount: { $size: '$transactionsList' },
+          totalIncome: {
+            $sum: {
+              $map: {
+                input: {
+                  $filter: {
+                    input: '$transactionsList',
+                    cond: { $eq: ['$$this.transactionType', 'credit'] },
+                  },
+                },
+                in: {
+                  $convert: {
+                    input: {
+                      $replaceAll: {
+                        input: { $ifNull: ['$$this.transactionValue', '0'] },
+                        find: ',',
+                        replacement: '.',
+                      },
+                    },
+                    to: 'double',
+                    onError: 0,
+                    onNull: 0,
+                  },
+                },
+              },
+            },
+          },
+          totalExpenses: {
+            $sum: {
+              $map: {
+                input: {
+                  $filter: {
+                    input: '$transactionsList',
+                    cond: { $eq: ['$$this.transactionType', 'debit'] },
+                  },
+                },
+                in: {
+                  $abs: {
+                    $convert: {
+                      input: {
+                        $replaceAll: {
+                          input: { $ifNull: ['$$this.transactionValue', '0'] },
+                          find: ',',
+                          replacement: '.',
+                        },
+                      },
+                      to: 'double',
+                      onError: 0,
+                      onNull: 0,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      // Add net amount
+      {
+        $addFields: {
+          netAmount: { $subtract: ['$totalIncome', '$totalExpenses'] },
+        },
+      },
+      // Remove the full transactions array to reduce payload
+      { $project: { transactionsList: 0 } },
+    ];
+
+    // Add sorting - convert string format to object format if needed
+    if (options.sort) {
+      let sortObj = options.sort;
+      // Convert string format (e.g., '-createdAt' or 'bookName') to object format
+      if (typeof options.sort === 'string') {
+        const sortStr = options.sort;
+        if (sortStr.startsWith('-')) {
+          sortObj = { [sortStr.substring(1)]: -1 };
+        } else {
+          sortObj = { [sortStr]: 1 };
+        }
+      }
+      pipeline.push({ $sort: sortObj });
+    }
+
+    // Add pagination
+    if (options.skip) {
+      pipeline.push({ $skip: options.skip });
+    }
+    if (options.limit) {
+      pipeline.push({ $limit: options.limit });
+    }
+
+    return await FiscalBookModel.aggregate(pipeline);
+  } catch (error) {
+    console.error('Error in findAllWithStats:', error.message);
+    throw new Error('Failed to retrieve fiscal books with statistics.');
+  }
+}
+
+/**
  * Find fiscal book by ID
  * @param {string} id - Fiscal book ID
  * @param {Object} session - MongoDB session for transactions
@@ -256,6 +377,7 @@ export async function reopenBook(id, session = null) {
       {
         status: 'Em Revisão',
         updatedAt: new Date(),
+        $unset: { closedAt: '' },
       },
       options
     );

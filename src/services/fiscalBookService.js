@@ -25,12 +25,51 @@ export async function createFiscalBook(fiscalBookData) {
 
 /**
  * Get all fiscal books with optional filtering
+ * Includes transaction count and financial summary for each book
  * @param {Object} filter - Filter criteria
  * @param {Object} options - Query options (pagination, sorting)
- * @returns {Promise<Array>} List of fiscal books
+ * @returns {Promise<Array>} List of fiscal books with statistics
  */
 export async function getAllFiscalBooks(filter = {}, options = {}) {
-  return await fiscalBookRepository.findAll(filter, options);
+  // Get all fiscal books using standard query
+  const books = await fiscalBookRepository.findAll(filter, options);
+  
+  // Add transaction count and financial summary for each book
+  const booksWithStats = await Promise.all(
+    books.map(async (book) => {
+      const bookObj = book.toObject ? book.toObject() : book;
+      const bookId = book._id || book.id;
+      
+      // Get transactions for this book
+      const transactions = await transactionRepository.findByFiscalBookId(bookId);
+      
+      // Compute financial summary
+      let totalIncome = 0;
+      let totalExpenses = 0;
+      
+      transactions.forEach(tx => {
+        // Handle both comma and period decimal formats
+        const valueStr = (tx.transactionValue || '0').replace(',', '.');
+        const value = parseFloat(valueStr) || 0;
+        
+        if (tx.transactionType === 'credit') {
+          totalIncome += value;
+        } else {
+          totalExpenses += Math.abs(value);
+        }
+      });
+      
+      return {
+        ...bookObj,
+        transactionCount: transactions.length,
+        totalIncome,
+        totalExpenses,
+        netAmount: totalIncome - totalExpenses,
+      };
+    })
+  );
+  
+  return booksWithStats;
 }
 
 /**

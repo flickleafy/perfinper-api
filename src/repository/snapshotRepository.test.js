@@ -269,7 +269,11 @@ describe('snapshotRepository', () => {
     test('returns paginated transactions', async () => {
       const query = makeQuery([{ id: 't1' }]);
       SnapshotTransactionModel.find.mockReturnValue(query);
-      SnapshotTransactionModel.countDocuments.mockReturnValue(makeExecQuery(1));
+      // countDocuments().session() returns a thenable that resolves to the count
+      const countQuery = {
+        session: jest.fn().mockResolvedValue(1),
+      };
+      SnapshotTransactionModel.countDocuments.mockReturnValue(countQuery);
 
       const result = await getSnapshotTransactions('snap1', { limit: 10, skip: 0 });
 
