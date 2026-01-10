@@ -3,23 +3,39 @@
   "version": "1.0.0",
   "main": "src/index.js",
   "license": "",
+  "type": "module",
+  "engines": {
+    "node": ">=18.x"
+  },
   "dependencies": {
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
-    "express": "^5.2.0",
-    "mongodb": "^6.5.0",
-    "mongoose": "^8.9.5",
-    "winston": "^3.13.0",
-    "winston-mongodb": "^5.1.1"
+    "cors": "2.8.5",
+    "date-fns": "4.1.0",
+    "dotenv": "17.2.0",
+    "express": "5.1.0",
+    "mongodb": "6.17.0",
+    "mongoose": "8.16.2",
+    "winston": "3.17.0",
+    "winston-mongodb": "7.0.0"
   },
   "devDependencies": {
-    "@types/express": "^4.17.21",
-    "@types/mongoose": "^5.11.97",
-    "nodemon": "^3.1.0"
+    "@babel/preset-env": "7.28.0",
+    "@jest/globals": "30.0.4",
+    "@types/cors": "2.8.19",
+    "@types/dotenv": "8.2.3",
+    "@types/express": "4.17.23",
+    "@types/mongoose": "5.11.97",
+    "@types/winston": "2.4.4",
+    "babel-jest": "30.0.4",
+    "jest": "30.0.4",
+    "nodemon": "3.1.10"
   },
   "scripts": {
-    "server": "node src/index.js",
-    "start": "node src/index.js"
+    "start": "nodemon src/index.js",
+    "prod": "node src/index.js",
+    "test": "NODE_OPTIONS='--experimental-vm-modules' jest --runInBand --silent",
+    "test:watch": "NODE_OPTIONS='--experimental-vm-modules' jest --watch --runInBand --silent",
+    "test:coverage": "NODE_OPTIONS='--experimental-vm-modules' jest --coverage --runInBand --silent",
+    "test:migration": "NODE_OPTIONS='--experimental-vm-modules' jest src/services/migrationService/migrateCompanyDataToCompanyCollection/__tests__ --runInBand --silent"
   },
   "nodemonConfig": {
     "ignore": [

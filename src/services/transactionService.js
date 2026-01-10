@@ -1,84 +1,68 @@
-const mongoose = require('mongoose');
-const logger = require('../config/logger.js');
-const ObjectId = mongoose.Types.ObjectId;
+import logger from '../config/logger.js';
+import {
+  insert,
+  findById,
+  findAllInPeriod,
+  findAllInYear,
+  updateById,
+  deleteById,
+  separateById,
+  deleteAllInPeriod,
+  findPeriods,
+  findYears,
+  findByFiscalBookId,
+  updateFiscalBookForTransactions,
+  removeFiscalBookFromTransactions,
+} from '../repository/transactionRepository.js';
+import * as fiscalBookRepository from '../repository/fiscalBookRepository.js';
+import { transactionPrototype } from './prototype/transactionPrototype.js';
 
-// Aqui havia um erro difícil de pegar. Importei como "transactionModel",
-// com "t" minúsculo. No Windows, isso não faz diferença. Mas como no Heroku
-// o servidor é Linux, isso faz diferença. Gastei umas boas horas tentando
-// descobrir esse erro :-/
-const TransactionModel = require('../models/TransactionModel.js');
-
-const insertTransaction = async (req, res) => {
+export const insertTransaction = async (req, res) => {
   try {
-    //
-    let newTransactionJSON = newTransaction(req.body);
-    const transaction = new TransactionModel(newTransactionJSON);
-    await transaction.save();
+    let transactionObject = transactionPrototype(req.body);
+    const transaction = await insert(transactionObject);
     res.send(transaction);
-    //
-    //logger.info(`POST /transaction - ${JSON.stringify()}`);
   } catch (error) {
     res.status(500).send({
       message: error.message || 'Algum erro ocorreu ao salvar transaction',
     });
-    // logger.error(`POST /transaction - ${JSON.stringify(error.message)}`);
   }
 };
 
-const findTransactionById = async (req, res) => {
+export const findTransactionById = async (req, res) => {
   let id = req.params.id;
-
-  //condicao para o filtro no findAll
-  /*let filter = name
-    ? { name: { $regex: new RegExp(name), $options: 'i' } }
-    : {};*/
-
   try {
-    //
-    const transaction = await TransactionModel.findById(id);
-
+    const transaction = await findById(id);
     if (!transaction) {
       return res.status(404).send({ message: 'Transaction não encontrada' });
     } else {
       res.send(transaction);
     }
-    //
-    //logger.info(`GET /transactions`);
   } catch (error) {
     res.status(500).send({
       message: error.message || 'Erro ao listar a transaction',
     });
-    // logger.error(`GET /transactions - ${JSON.stringify(error.message)}`);
   }
 };
 
-const findAllTransactionsInPeriod = async (req, res) => {
-  const period = req.params.yearMonth;
-
+export const findAllTransactionsInPeriod = async (req, res) => {
+  const period = String(req.params.transactionPeriod);
   try {
-    //
-    // let regex = new RegExp(req.params.id, 'i');
-    let transaction;
-    try {
-      transaction = await TransactionModel.find({ yearMonth: period }).sort({
-        day: 1,
-      });
-    } catch (error) {
-      // logger.error(`GET /transactionsInPeriod - ${JSON.stringify(error.message)}`);
+    let transactions = [];
+    if (period.length === 4) {
+      transactions = await findAllInYear(period);
+    } else {
+      transactions = await findAllInPeriod(period);
     }
-
-    res.send(transaction);
-    //
-    //logger.info(`GET /transactionsInPeriod - ${period}`);
+    res.send(transactions);
   } catch (error) {
     res
       .status(500)
       .send({ message: 'Erro ao buscar transações do periodo: ' + period });
-    // logger.error(`GET /transactionsInPeriod - ${JSON.stringify(error.message)}`);
   }
 };
 
-const updateTransactionById = async (req, res) => {
+export const updateTransactionById = async (req, res) => {
   const id = req.params.id;
   if (!req.body) {
     return res.status(400).send({
@@ -86,121 +70,211 @@ const updateTransactionById = async (req, res) => {
     });
   }
 
-  let newTransactionJSON = newTransaction(req.body);
-
-  let transaction = null;
+  let transactionObject = transactionPrototype(req.body);
   try {
-    transaction = await TransactionModel.findByIdAndUpdate(
-      id,
-      newTransactionJSON
-    );
-    //
+    let transaction = await updateById(id, transactionObject);
+    if (!transaction) {
+      return res.status(404).send({ message: 'Transaction não encontrada' });
+    }
     res.send({ message: 'Transaction atualizada com sucesso' });
-
-    //logger.info(`PUT /transaction - ${id} - ${JSON.stringify(req.body)}`);
   } catch (error) {
     res.status(500).send({ message: 'Erro ao atualizar a transaction: ' + id });
-    // logger.error(`PUT /transaction - ${JSON.stringify(error.message)}`);
   }
 };
 
-const deleteTransactionById = async (req, res) => {
+export const deleteTransactionById = async (req, res) => {
   const id = req.params.id;
-
   try {
-    //
-
-    const transaction = await TransactionModel.findByIdAndDelete(id);
+    const transaction = await deleteById(id);
     if (!transaction) {
       return res.status(404).send({ message: 'Transaction não encontrada' });
     } else {
       res.send({ message: 'Transaction excluida com sucesso' });
     }
-    //logger.info(`DELETE /transaction - ${id}`);
   } catch (error) {
     res
       .status(500)
       .send({ message: 'Nao foi possivel deletar a transaction: ' + id });
-    // logger.error(`DELETE /transaction - ${JSON.stringify(error.message)}`);
   }
 };
 
-const removeAllTransactionsInPeriod = async (req, res) => {
+export const separateTransactionById = async (req, res) => {
+  const id = req.params.id;
+  try {
+    const transaction = await separateById(id);
+    if (!transaction) {
+      return res.status(404).send({ message: 'Transaction não encontrada' });
+    } else {
+      res.send({ message: 'Transaction separada com sucesso' });
+    }
+  } catch (error) {
+    res.status(500).send({
+      message: error.message || 'Algum erro ocorreu ao separar transaction',
+    });
+  }
+};
+
+export const removeAllTransactionsInPeriod = async (req, res) => {
   const period = req.query.period;
-  //condicao para o filtro no findAll
-  let filter = period
-    ? { name: { $regex: new RegExp(period), $options: 'i' } }
-    : {};
 
   try {
-    //
-    //const transaction = await TransactionModel.deleteMany(filter);
-    //
-    res.send({
-      message: `Transactions excluidos`,
-    });
-    //logger.info(`DELETE /transactions`);
+    await deleteAllInPeriod(period);
+    res.send({ message: `Transactions excluidos` });
   } catch (error) {
     res.status(500).send({
       message: 'Erro ao excluir todas as transactions do periodo: ' + period,
     });
-    // logger.error(`DELETE /transactions - ${JSON.stringify(error.message)}`);
   }
 };
 
-const findUniquePeriods = async (req, res) => {
-  let periods = req;
+export const findUniquePeriods = async (req, res) => {
+  try {
+    let periods = await findPeriods();
+    res.send(periods);
+  } catch (error) {
+    res.status(500).send({ message: 'Erro ao buscar periodos' });
+  }
+};
+
+export const findUniqueYears = async (req, res) => {
+  try {
+    let years = await findYears();
+    res.send(years);
+  } catch (error) {
+    res.status(500).send({ message: 'Erro ao buscar anos' });
+  }
+};
+
+/**
+ * Get transactions by fiscal book ID
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+export const getTransactionsByFiscalBookId = async (req, res) => {
+  const fiscalBookId = req.params.fiscalBookId;
 
   try {
-    try {
-      periods = await TransactionModel.find({}) // campos retornados
-        .distinct('yearMonth');
-    } catch (error) {
-      // logger.error(`GET /transactionsInPeriod - ${JSON.stringify(error.message)}`);
+    // Verify fiscal book exists
+    const fiscalBook = await fiscalBookRepository.findById(fiscalBookId);
+    if (!fiscalBook) {
+      return res.status(404).send({ message: 'Fiscal book not found' });
     }
 
-    res.send(periods);
-    //
-    //logger.info(`GET /transactionsInPeriod - ${period}`);
+    const transactions = await findByFiscalBookId(fiscalBookId);
+    res.send(transactions);
+  } catch (error) {
+    res.status(500).send({
+      message:
+        error.message ||
+        `Error retrieving transactions for fiscal book ${fiscalBookId}`,
+    });
+  }
+};
+
+/**
+ * Assign transactions to a fiscal book
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+export const assignTransactionsToFiscalBook = async (req, res) => {
+  const { fiscalBookId, transactionIds } = req.body;
+
+  if (!fiscalBookId || !transactionIds || !Array.isArray(transactionIds)) {
+    return res.status(400).send({
+      message: 'Fiscal book ID and an array of transaction IDs are required',
+    });
+  }
+
+  try {
+    // Verify fiscal book exists
+    const fiscalBook = await fiscalBookRepository.findById(fiscalBookId);
+    if (!fiscalBook) {
+      return res.status(404).send({ message: 'Fiscal book not found' });
+    }
+
+    const result = await updateFiscalBookForTransactions(
+      transactionIds,
+      fiscalBookId
+    );
+    res.send({
+      message: `Successfully assigned ${result.modifiedCount} transactions to fiscal book`,
+      modifiedCount: result.modifiedCount,
+    });
+  } catch (error) {
+    res.status(500).send({
+      message: error.message || 'Error assigning transactions to fiscal book',
+    });
+  }
+};
+
+/**
+ * Remove transactions from a fiscal book
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+export const removeTransactionsFromFiscalBook = async (req, res) => {
+  const fiscalBookId = req.params.fiscalBookId;
+
+  try {
+    // Verify fiscal book exists
+    const fiscalBook = await fiscalBookRepository.findById(fiscalBookId);
+    if (!fiscalBook) {
+      return res.status(404).send({ message: 'Fiscal book not found' });
+    }
+
+    const result = await removeFiscalBookFromTransactions(fiscalBookId);
+    res.send({
+      message: `Successfully removed ${result.modifiedCount} transactions from fiscal book`,
+      modifiedCount: result.modifiedCount,
+    });
+  } catch (error) {
+    res.status(500).send({
+      message:
+        error.message ||
+        `Error removing transactions from fiscal book ${fiscalBookId}`,
+    });
+  }
+};
+
+/**
+ * Update fiscal book for a single transaction
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+export const updateTransactionFiscalBook = async (req, res) => {
+  const id = req.params.id;
+  const { fiscalBookId } = req.body;
+
+  if (fiscalBookId === undefined || fiscalBookId === '') {
+    return res.status(400).send({ message: 'Fiscal book ID is required' });
+  }
+
+  try {
+    // Verify fiscal book exists if not removing
+    if (fiscalBookId !== null) {
+      const fiscalBook = await fiscalBookRepository.findById(fiscalBookId);
+      if (!fiscalBook) {
+        return res.status(404).send({ message: 'Fiscal book not found' });
+      }
+    }
+
+    // Update transaction with fiscal book ID
+    const updateData =
+      fiscalBookId === null
+        ? { $unset: { fiscalBookId: '' } }
+        : { fiscalBookId };
+
+    const transaction = await updateById(id, updateData);
+    if (!transaction) {
+      return res.status(404).send({ message: 'Transaction not found' });
+    }
+
+    res.send({ message: 'Transaction fiscal book updated successfully' });
   } catch (error) {
     res
       .status(500)
-      .send({ message: 'Erro ao buscar transações do periodo: ' + periods });
-    // logger.error(`GET /transactionsInPeriod - ${JSON.stringify(error.message)}`);
+      .send({
+        message: `Error updating transaction fiscal book: ${error.message}`,
+      });
   }
-};
-
-// helper functions
-function newTransaction(body) {
-  const { description, value, category, year, month, day, type } = body;
-
-  let json = {
-    description: description,
-    value: value,
-    category: category,
-    year: year,
-    month: month,
-    day: day,
-    yearMonth: `${year}-${checkSingleDigit(month)}`,
-    yearMonthDay: `${year}-${checkSingleDigit(month)}-${checkSingleDigit(day)}`,
-    type: type,
-  };
-  return json;
-}
-
-function checkSingleDigit(number) {
-  if (/^\d$/.test(number)) {
-    return `0${number}`;
-  }
-  return number;
-}
-
-module.exports = {
-  insertTransaction: insertTransaction,
-  findTransactionById: findTransactionById,
-  updateTransactionById: updateTransactionById,
-  deleteTransactionById: deleteTransactionById,
-  findAllTransactionsInPeriod: findAllTransactionsInPeriod,
-  removeAllTransactionsInPeriod: removeAllTransactionsInPeriod,
-  findUniquePeriods: findUniquePeriods,
 };

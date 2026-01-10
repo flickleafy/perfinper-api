@@ -22,3 +22,15 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+*/services/import*
+*/services/export*
+
+# Ignore all markdown files except README.md
+*.md
+!README.md
+!CHANGELOG.md
+.vscode
+
+logs
+docs
