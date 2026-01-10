@@ -1,37 +1,38 @@
-const winston = require('winston');
-const winstondb = require('winston-mongodb');
+import winston from 'winston';
+import winstonMongoDB from 'winston-mongodb';
+import dotenv from 'dotenv';
 
-const dotenv = require('dotenv');
 dotenv.config();
 
-const { combine, timestamp, label, printf } = winston.format;
-
 const { createLogger, transports, format } = winston;
+const { combine, timestamp, label, printf } = format;
 
-const myFormat = format.printf(({ level, message, label, timestamp }) => {
+const myFormat = printf(({ level, message, label, timestamp }) => {
   return `${timestamp} [${label}] ${level}: ${message}`;
 });
 
 const logger = createLogger({
   transports: [
     new transports.Console(),
+    new transports.File({
+      filename: 'logs/application.log',
+      maxsize: 10485760, // 10MB
+      maxFiles: 5,
+      tailable: true,
+    }),
     new transports.MongoDB({
       level: 'info',
       db: process.env.DB_CONNECTION,
       collection: 'logs_transactions',
       capped: true,
-      cappedMax: 20,
-      options: {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-      },
+      cappedMax: 1000, // Increased from 20 to 1000 to allow for more log entries
     }),
   ],
-  format: format.combine(
+  format: combine(
     label({ label: 'personalfinance-api' }),
-    format.timestamp(),
+    timestamp(),
     myFormat
   ),
 });
 
-module.export = logger;
+export default logger;
