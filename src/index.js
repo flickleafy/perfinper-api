@@ -8,8 +8,10 @@ import personRoutes from './routes/personRoutes.js';
 import importRoutes from './routes/importRoutes.js';
 import exportRoutes from './routes/exportRoutes.js';
 import fiscalBookRoutes from './routes/fiscalBookRoutes.js';
+import snapshotRoutes from './routes/snapshotRoutes.js';
 import dotenv from 'dotenv';
 import { initializeDatabase } from './services/initializationService.js';
+import { initSnapshotCronJobs } from './cron/snapshotCron.js';
 import {
   // identifyAndUpdateCompanyFields,
   // migrateCompanyDataToCompanyCollection,
@@ -37,6 +39,7 @@ app.use('/api/person', personRoutes);
 app.use('/api/import', importRoutes);
 app.use('/api/export', exportRoutes);
 app.use('/api/fiscal-book', fiscalBookRoutes);
+app.use('/api', snapshotRoutes); // Snapshot routes under /api
 
 /**
  * Database Connection Setup
@@ -63,6 +66,10 @@ const initialize = async () => {
   // Initiate the connection
   await connectDB();
   await initializeDatabase();
+  
+  // Initialize cron jobs for scheduled snapshots
+  initSnapshotCronJobs();
+  
   // await identifyAndUpdateCompanyFields();
   // await migrateCompanyDataToCompanyCollection(false);
   // await migrateTransactionsToFiscalBooks();

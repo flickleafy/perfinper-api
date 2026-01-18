@@ -313,7 +313,7 @@ describe('transactionService', () => {
     transactionRepository.deleteAllInPeriod.mockResolvedValue(undefined);
     const res = createRes();
 
-    await removeAllTransactionsInPeriod({ query: { period: '2024-01' } }, res);
+    await removeAllTransactionsInPeriod({ params: { transactionPeriod: '2024-01' } }, res);
 
     expect(transactionRepository.deleteAllInPeriod).toHaveBeenCalledWith('2024-01');
     expect(res.send).toHaveBeenCalledWith(
@@ -325,7 +325,7 @@ describe('transactionService', () => {
     transactionRepository.deleteAllInPeriod.mockRejectedValue(new Error('fail'));
     const res = createRes();
 
-    await removeAllTransactionsInPeriod({ query: { period: '2024-01' } }, res);
+    await removeAllTransactionsInPeriod({ params: { transactionPeriod: '2024-01' } }, res);
 
     expect(res.status).toHaveBeenCalledWith(500);
   });

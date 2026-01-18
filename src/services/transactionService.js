@@ -115,7 +115,13 @@ export const separateTransactionById = async (req, res) => {
 };
 
 export const removeAllTransactionsInPeriod = async (req, res) => {
-  const period = req.query.period;
+  const period = req.params.transactionPeriod;
+
+  if (!period) {
+    return res.status(400).send({
+      message: 'Transaction period is required',
+    });
+  }
 
   try {
     await deleteAllInPeriod(period);
